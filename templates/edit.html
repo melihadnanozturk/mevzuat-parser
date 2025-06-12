@@ -146,12 +146,7 @@
                         <i class="bi bi-save me-2"></i>
                         Kaydet
                     </button>
-                    {% if result.get('_metadata') and result._metadata.get('file_type') == 'pdf' %}
-                    <button id="togglePdfBtn" class="btn btn-info me-2">
-                        <i class="bi bi-file-pdf me-2"></i>
-                        PDF Görüntüle
-                    </button>
-                    {% endif %}
+
                     <a href="{{ url_for('download_file', filename=json_filename) }}" 
                        class="btn btn-primary me-2">
                         <i class="bi bi-download me-2"></i>
@@ -175,72 +170,7 @@
             </div>
         </div>
 
-        <!-- Split Layout: PDF Viewer + Editor -->
-        <div class="split-layout">
-            <!-- PDF Panel -->
-            <div class="pdf-panel">
-                <div class="pdf-viewer-container">
-                    <div class="pdf-viewer-header">
-                        <h6 class="mb-0">
-                            <i class="bi bi-file-pdf me-2"></i>
-                            <span id="pdfFileName">
-                                {% if result.get('_metadata') and result._metadata.get('file_type') == 'pdf' %}
-                                    {{ result._metadata.original_filename }}
-                                {% else %}
-                                    Orijinal Dosya
-                                {% endif %}
-                            </span>
-                        </h6>
-                    </div>
-                    {% if result.get('_metadata') and result._metadata.get('file_type') == 'pdf' %}
-                        <div id="pdfViewerContainer" class="pdf-iframe">
-                            <div class="pdf-controls p-2 border-bottom d-flex justify-content-between align-items-center bg-light">
-                                <div>
-                                    <button id="prevPage" class="btn btn-sm btn-outline-secondary me-1">
-                                        <i class="bi bi-chevron-left"></i>
-                                    </button>
-                                    <span id="pageInfo" class="mx-2 small">Sayfa: 1 / 1</span>
-                                    <button id="nextPage" class="btn btn-sm btn-outline-secondary me-2">
-                                        <i class="bi bi-chevron-right"></i>
-                                    </button>
-                                </div>
-                                <div>
-                                    <button id="zoomOut" class="btn btn-sm btn-outline-secondary me-1">
-                                        <i class="bi bi-zoom-out"></i>
-                                    </button>
-                                    <span id="zoomLevel" class="mx-2 small">100%</span>
-                                    <button id="zoomIn" class="btn btn-sm btn-outline-secondary me-2">
-                                        <i class="bi bi-zoom-in"></i>
-                                    </button>
-                                    <button id="openPdfNewTab" class="btn btn-sm btn-primary">
-                                        <i class="bi bi-box-arrow-up-right"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            <div id="pdfCanvas" class="overflow-auto" style="height: calc(100% - 60px); position: relative;">
-                                <div class="d-flex justify-content-center align-items-center h-100" id="pdfLoadingIndicator">
-                                    <div class="text-center">
-                                        <div class="spinner-border text-primary" role="status">
-                                            <span class="visually-hidden">Yükleniyor...</span>
-                                        </div>
-                                        <p class="mt-2 text-muted">PDF yükleniyor...</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    {% else %}
-                        <div class="no-pdf-message">
-                            <i class="bi bi-file-earmark-text display-4 mb-3"></i>
-                            <h5>PDF Mevcut Değil</h5>
-                            <p>Bu dosya PDF formatında değil veya görüntülenemiyor.</p>
-                            <small class="text-muted">Dosya Türü: {{ result.get('_metadata', {}).get('file_type', 'Bilinmiyor') }}</small>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
 
-            <!-- Edit Panel -->
-            <div class="edit-panel full-width" id="editPanel">
                 <!-- Document Title -->
                 <div class="card mb-4">
                     <div class="card-header">
