@@ -336,6 +336,11 @@
             }
         }
         
+        // Save button event listener
+        saveBtn.addEventListener('click', function() {
+            saveDocument();
+        });
+        
         // Event listeners for editing
         document.addEventListener('input', function(e) {
             if (e.target.classList.contains('editable')) {
