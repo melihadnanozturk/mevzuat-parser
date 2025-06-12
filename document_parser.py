@@ -249,6 +249,6 @@ class DocumentParser:
         # Standardize format
         header = re.sub(r'(?i)(madde)\s+(\d+|[ivxlcdm]+)\s*[–\-:]\s*', r'Madde \2', header)
         header = re.sub(r'(?i)(madde)\s+(\d+|[ivxlcdm]+)\s*\.?\s*', r'Madde \2', header)
-        header = re.sub(r'^(\d+)\s*\.\s*(?i)(madde)', r'Madde \1', header)
+        header = re.sub(r'(?i)^(\d+)\s*\.\s*(madde)', r'Madde \1', header)
         
         return header.strip()
