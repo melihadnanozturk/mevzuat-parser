@@ -166,11 +166,25 @@ class DocumentParser:
             self.logger.warning("No articles found in document")
             return []
         
-        # Extract content for each article
-        for i, (start_pos, end_pos, article_header) in enumerate(article_matches):
+        # Remove duplicates and overlapping matches
+        filtered_matches = []
+        for start_pos, end_pos, article_header in article_matches:
+            # Check if this match overlaps with any existing match
+            is_duplicate = False
+            for existing_start, existing_end, existing_header in filtered_matches:
+                # If positions are very close (within 10 characters), consider it a duplicate
+                if abs(start_pos - existing_start) <= 10:
+                    is_duplicate = True
+                    break
+            
+            if not is_duplicate:
+                filtered_matches.append((start_pos, end_pos, article_header))
+        
+        # Extract content for each unique article
+        for i, (start_pos, end_pos, article_header) in enumerate(filtered_matches):
             # Determine the end position of this article's content
-            if i + 1 < len(article_matches):
-                content_end = article_matches[i + 1][0]
+            if i + 1 < len(filtered_matches):
+                content_end = filtered_matches[i + 1][0]
             else:
                 content_end = len(text)
             
@@ -183,10 +197,12 @@ class DocumentParser:
             # Clean up article header
             article_number = self._clean_article_header(article_header)
             
-            articles.append({
-                "madde_numarasi": article_number,
-                "fikralar": paragraphs
-            })
+            # Only add articles that have content
+            if paragraphs:
+                articles.append({
+                    "madde_numarasi": article_number,
+                    "fikralar": paragraphs
+                })
         
         return articles
     
