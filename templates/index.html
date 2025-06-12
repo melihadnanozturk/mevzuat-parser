@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="tr" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Türk Mevzuat Çıkarıcı</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8 col-lg-6">
+                <div class="card">
+                    <div class="card-header text-center">
+                        <h1 class="card-title mb-0">
+                            <i class="bi bi-file-text me-2"></i>
+                            Türk Mevzuat Çıkarıcı
+                        </h1>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-4">
+                            Word (.doc, .docx) veya PDF (.pdf) formatındaki mevzuat dosyalarınızı yükleyin. 
+                            Sistem otomatik olarak mevzuat başlığını, maddeleri ve fıkraları tespit ederek 
+                            yapılandırılmış JSON formatında çıktı üretecektir.
+                        </p>
+
+                        <!-- Flash messages -->
+                        {% with messages = get_flashed_messages(with_categories=true) %}
+                            {% if messages %}
+                                {% for category, message in messages %}
+                                    <div class="alert alert-{{ 'danger' if category == 'error' else 'info' }} alert-dismissible fade show" role="alert">
+                                        <i class="bi bi-{{ 'exclamation-triangle' if category == 'error' else 'info-circle' }} me-2"></i>
+                                        {{ message }}
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+                        {% endwith %}
+
+                        <form action="{{ url_for('upload_file') }}" method="POST" enctype="multipart/form-data" id="uploadForm">
+                            <div class="mb-4">
+                                <label for="file" class="form-label">
+                                    <i class="bi bi-cloud-upload me-2"></i>
+                                    Mevzuat Dosyası Seçin
+                                </label>
+                                <input type="file" 
+                                       class="form-control" 
+                                       id="file" 
+                                       name="file" 
+                                       accept=".doc,.docx,.pdf"
+                                       required>
+                                <div class="form-text">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Desteklenen formatlar: .doc, .docx, .pdf (Maksimum 16MB)
+                                </div>
+                            </div>
+
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                                    <i class="bi bi-arrow-up-circle me-2"></i>
+                                    Dosyayı Yükle ve İşle
+                                </button>
+                            </div>
+                        </form>
+
+                        <div class="mt-4 p-3 bg-body-secondary rounded">
+                            <h6 class="fw-bold mb-2">
+                                <i class="bi bi-lightbulb me-2"></i>
+                                Nasıl Çalışır?
+                            </h6>
+                            <ul class="mb-0 small">
+                                <li>Mevzuat başlığı otomatik olarak tespit edilir</li>
+                                <li>"Madde X:" formatındaki maddeler ayrıştırılır</li>
+                                <li>Her madde içindeki fıkralar "(1)", "(2)" gibi işaretlerle belirlenir</li>
+                                <li>Tüm içerik yapılandırılmış JSON formatında sunulur</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading overlay -->
+    <div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none" style="background: rgba(0,0,0,0.8); z-index: 9999;">
+        <div class="d-flex align-items-center justify-content-center h-100">
+            <div class="text-center text-white">
+                <div class="spinner-border mb-3" role="status" style="width: 3rem; height: 3rem;">
+                    <span class="visually-hidden">Yükleniyor...</span>
+                </div>
+                <h5>Dosya işleniyor...</h5>
+                <p class="text-muted">Lütfen bekleyin, bu işlem birkaç dakika sürebilir.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            const fileInput = document.getElementById('file');
+            const submitBtn = document.getElementById('submitBtn');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            
+            if (!fileInput.files[0]) {
+                alert('Lütfen bir dosya seçin.');
+                e.preventDefault();
+                return;
+            }
+            
+            // Check file size (16MB = 16 * 1024 * 1024 bytes)
+            if (fileInput.files[0].size > 16 * 1024 * 1024) {
+                alert('Dosya çok büyük. Maksimum dosya boyutu 16MB olmalıdır.');
+                e.preventDefault();
+                return;
+            }
+            
+            // Check file extension
+            const fileName = fileInput.files[0].name.toLowerCase();
+            const allowedExtensions = ['.doc', '.docx', '.pdf'];
+            const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
+            
+            if (!hasValidExtension) {
+                alert('Geçersiz dosya formatı. Sadece .doc, .docx ve .pdf dosyaları kabul edilir.');
+                e.preventDefault();
+                return;
+            }
+            
+            // Show loading overlay
+            loadingOverlay.classList.remove('d-none');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>İşleniyor...';
+        });
+        
+        // File input change handler
+        document.getElementById('file').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                // Update form text to show selected file
+                const fileText = document.querySelector('.form-text');
+                fileText.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Seçilen dosya: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+            }
+        });
+    </script>
+</body>
+</html>
