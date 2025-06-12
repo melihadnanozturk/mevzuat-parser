@@ -20,6 +20,65 @@ class DocumentParser:
         # Pattern for paragraph markers
         self.paragraph_pattern = r'^\s*\((\d+)\)\s*'
         
+        # Patterns for subject headers that should be excluded from paragraphs
+        self.subject_header_patterns = [
+            r'^\s*(?:DAYANAK|dayanak)\s*(?:/|\|)?\s*(?:AMAÇ|amaç)\s*(?:/|\|)?\s*(?:KAPSAM|kapsam)?\s*$',
+            r'^\s*(?:TANIM|tanım|TANIMLAR|tanımlar|TARİF|tarif|TARİFLER|tarifler)\s*$',
+            r'^\s*(?:DANIŞMAN|danışman)\s*$',
+            r'^\s*(?:DANIŞMANLIK|danışmanlık)\s+(?:KRİTERLERİ|kriterleri)\s*$',
+            r'^\s*(?:DANIŞMANIN|danışmanın)\s+(?:GÖREVLERİ|görevleri)\s*$',
+            r'^\s*(?:DANIŞMAN|danışman)\s+(?:GÖREVLENDİRİLMESİ|görevlendirilmesi)\s*$',
+            r'^\s*(?:DANIŞMAN|danışman)\s+(?:TERCİHİ|tercihi)\s+(?:VE|ve)\s+(?:ATANMASI|atanması)\s*$',
+            r'^\s*(?:DANIŞMAN|danışman)\s+(?:DEĞİŞİKLİĞİ|değişikliği)\s*$',
+            r'^\s*(?:ZORUNLU|zorunlu)\s+(?:HALLERDE|hallerde)\s+(?:DANIŞMAN|danışman)\s+(?:DEĞİŞİKLİĞİ|değişikliği)\s*$',
+            r'^\s*(?:İKİNCİ|ikinci)\s+(?:TEZ|tez)\s+(?:DANIŞMANI|danışmanı)\s+(?:ATAMA|atama)\s*(?:\(.*\))?\s*$',
+            r'^\s*(?:YÜRÜRLÜK|yürürlük)\s*$',
+            r'^\s*(?:AMAÇ|amaç)\s*$',
+            r'^\s*(?:KAPSAM|kapsam)\s*$',
+            r'^\s*(?:DAYANAK|dayanak)\s*$',
+            r'^\s*(?:BAŞVURU|başvuru)\s*(?:ŞARTLARI|şartları)?\s*$',
+            r'^\s*(?:UYGULAMA|uygulama)\s*(?:ESASLARI|esasları)?\s*$',
+            r'^\s*(?:DEĞERLENDIRME|değerlendirme)\s*(?:KRİTERLERİ|kriterleri)?\s*$',
+            r'^\s*(?:İLGİLİ|ilgili)\s+(?:MEVZUAT|mevzuat)\s*$',
+            r'^\s*(?:GENEL|genel)\s+(?:HÜKÜMLER|hükümler)\s*$',
+            r'^\s*(?:ÖZEL|özel)\s+(?:HÜKÜMLER|hükümler)\s*$',
+            r'^\s*(?:SON|son)\s+(?:HÜKÜMLER|hükümler)\s*$'
+        ]
+        
+    def _is_subject_header(self, line: str) -> bool:
+        """Check if a line is a subject header that should be excluded from paragraphs."""
+        line = line.strip()
+        
+        # Skip very short lines (less than 3 characters)
+        if len(line) < 3:
+            return False
+            
+        # Check against subject header patterns
+        for pattern in self.subject_header_patterns:
+            if re.match(pattern, line, re.IGNORECASE):
+                return True
+        
+        # Additional heuristics for subject headers
+        # Check if line is short (less than 50 chars), mostly uppercase, and doesn't end with punctuation
+        if (len(line) < 50 and 
+            line.isupper() and 
+            not line.endswith(('.', ':', ';', '!', '?')) and
+            not re.search(r'\d', line)):  # No numbers
+            return True
+            
+        # Check if line contains common subject header words and is relatively short
+        subject_keywords = [
+            'dayanak', 'amaç', 'kapsam', 'tanım', 'danışman', 'yürürlük', 
+            'başvuru', 'uygulama', 'değerlendirme', 'genel', 'özel', 'son'
+        ]
+        
+        if (len(line) < 80 and 
+            any(keyword in line.lower() for keyword in subject_keywords) and
+            len(line.split()) <= 5):  # Maximum 5 words
+            return True
+            
+        return False
+        
     def parse_document(self, filepath: str) -> Optional[Dict]:
         """Parse a document and extract legal content."""
         try:
@@ -227,18 +286,25 @@ class DocumentParser:
                 if not line:
                     continue
                 
+                # Skip subject headers
+                if self._is_subject_header(line):
+                    self.logger.debug(f"Skipping subject header: {line}")
+                    continue
+                
                 # Check if line starts with paragraph marker like "(1)", "(2)", etc.
                 paragraph_match = re.match(self.paragraph_pattern, line)
                 
                 if paragraph_match:
                     # Save previous paragraph if exists
                     if current_paragraph:
-                        paragraphs.append(' '.join(current_paragraph).strip())
+                        paragraph_text = ' '.join(current_paragraph).strip()
+                        if paragraph_text and not self._is_subject_header(paragraph_text):
+                            paragraphs.append(paragraph_text)
                         current_paragraph = []
                     
                     # Start new paragraph (remove the number marker)
                     line = re.sub(self.paragraph_pattern, '', line).strip()
-                    if line:
+                    if line and not self._is_subject_header(line):
                         current_paragraph = [line]
                 else:
                     # Continue current paragraph
@@ -246,14 +312,25 @@ class DocumentParser:
             
             # Add the last paragraph
             if current_paragraph:
-                paragraphs.append(' '.join(current_paragraph).strip())
+                paragraph_text = ' '.join(current_paragraph).strip()
+                if paragraph_text and not self._is_subject_header(paragraph_text):
+                    paragraphs.append(paragraph_text)
         
-        # If no numbered paragraphs found, treat the whole content as one paragraph
+        # If no numbered paragraphs found, process the content line by line
         if not paragraphs and article_content.strip():
-            # Remove any remaining newlines and clean up
-            clean_content = ' '.join(article_content.split())
-            if clean_content:
-                paragraphs.append(clean_content)
+            lines = article_content.split('\n')
+            filtered_lines = []
+            
+            for line in lines:
+                line = line.strip()
+                if line and not self._is_subject_header(line):
+                    filtered_lines.append(line)
+            
+            if filtered_lines:
+                # Join non-header lines into paragraphs
+                clean_content = ' '.join(filtered_lines)
+                if clean_content:
+                    paragraphs.append(clean_content)
         
         return paragraphs
     

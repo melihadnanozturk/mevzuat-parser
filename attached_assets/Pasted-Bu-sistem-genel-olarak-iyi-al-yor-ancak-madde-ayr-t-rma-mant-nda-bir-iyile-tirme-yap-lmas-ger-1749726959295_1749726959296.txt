@@ -1,0 +1,37 @@
+Bu sistem genel olarak iyi çalışıyor ancak madde ayrıştırma mantığında bir iyileştirme yapılması gerekiyor.
+
+MEVCUT SORUN:
+Mevcut ayrıştırma mantığı, bir "MADDE X" satırından sonra gelen ve aslında o maddenin konusunu belirten **ara başlıkları**, maddenin bir fıkrasıymış gibi `fikralar` listesine dahil ediyor. Bu istenmeyen bir durumdur.
+
+İSTENEN İYİLEŞTİRME:
+Python'daki dosya ayrıştırma (parsing) fonksiyonlarını (muhtemelen `app.py` içinde veya ilgili bir modülde) aşağıdaki şekilde güncellemeni istiyorum:
+
+1.  **Ara Başlıkların Tespiti ve Hariç Tutulması:**
+    *   Bir "MADDE X" (örneğin, "MADDE 1-", "MADDE 1)", "Madde 1:") satırı tespit edildikten sonra, asıl fıkra metinlerine geçmeden önce gelen bazı satırlar ara başlık niteliğinde olabilir.
+    *   Bu ara başlıklar, genellikle kısa, tek satırlık, büyük harflerle yazılmış veya belirgin bir şekilde formatlanmış (örneğin kalın) olabilir ve maddenin genel konusunu (Dayanak, Amaç, Kapsam, Tanımlar vb.) belirtirler.
+    *   Bu tür ara başlık satırları, maddenin bir fıkrası olarak KABUL EDİLMEMELİ ve JSON çıktısındaki ilgili maddenin `fikralar` dizisine EKLENMEMELİDİR.
+    *   **Hariç Tutulması Gereken Ara Başlık Örnekleri (Bunlar ve benzeri yapılar hedeflenmeli, büyük/küçük harf duyarsızlığı ve olası format farklılıkları göz önünde bulundurulmalı):**
+        *   "Dayanak / Amaç / Kapsam"
+        *   "Tanımlar"
+        *   "Danışman"
+        *   "Danışmanlık Kriterleri"
+        *   "Danışmanın Görevleri"
+        *   "Danışman Görevlendirilmesi"
+        *   "Danışman Tercihi Ve Atanması"
+        *   "Danışman Değişikliği"
+        *   "Zorunlu Hallerde Danışman Değişikliği"
+        *   "İkinci Tez Danışmanı Atama (Ortak Danışman)"
+        *   "Yürürlük"
+        *   (Bu liste örnektir, benzer yapılar da tespit edilmelidir. Örneğin, sadece "AMAÇ" veya "**KAPSAM**" gibi.)
+
+2.  **Fıkra Ayrıştırma Mantığının Korunması:**
+    *   Yukarıda belirtilen ara başlıklar hariç tutulduktan sonra, maddenin asıl fıkraları (genellikle numaralandırılmış, harflendirilmiş veya düz metin paragrafları) doğru bir şekilde tespit edilip `fikralar` dizisine eklenmeye devam etmelidir.
+
+3.  **JSON Çıktı Formatının Korunması:**
+    *   Genel JSON yapısı (`mevzuat_basligi`, `maddeler`, her madde için `madde_numarasi` ve `fikralar` listesi) aynı kalmalıdır. Değişiklik sadece `fikralar` listesinin içeriğini etkileyecektir (ara başlıklar çıkarılacak).
+
+LÜTFEN İSTENENLER:
+*   Mevcut Python ayrıştırma kodundaki ilgili fonksiyon(lar)ı bu yeni mantığa göre güncelle.
+*   Güncellenmiş Python kodu parçacıklarını ve eğer gerekiyorsa bu değişikliği destekleyecek yeni regex ifadelerini veya heuristik yaklaşımları belirt.
+
+Özetle, hedefimiz, madde metnini ayrıştırırken, "MADDE X" başlığından sonra gelen ve fıkra olmayan konu başlıklarını atlayıp, sadece gerçek fıkra içeriklerini `fikralar` listesine almak.
