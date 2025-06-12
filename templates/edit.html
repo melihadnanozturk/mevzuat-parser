@@ -63,10 +63,50 @@
         .drag-handle:hover {
             color: var(--bs-primary);
         }
+        .split-layout {
+            display: flex;
+            height: calc(100vh - 200px);
+            gap: 16px;
+        }
+        .pdf-panel {
+            flex: 0 0 50%;
+            border: 1px solid var(--bs-border-color);
+            border-radius: 8px;
+            background: var(--bs-body-bg);
+        }
+        .edit-panel {
+            flex: 1;
+            overflow-y: auto;
+            max-height: calc(100vh - 200px);
+        }
+        .pdf-viewer-container {
+            height: 100%;
+            position: relative;
+        }
+        .pdf-viewer-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--bs-border-color);
+            background: var(--bs-body-secondary);
+            border-radius: 8px 8px 0 0;
+        }
+        .pdf-iframe {
+            width: 100%;
+            height: calc(100% - 60px);
+            border: none;
+            border-radius: 0 0 8px 8px;
+        }
+        .no-pdf-message {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            flex-direction: column;
+            color: var(--bs-text-muted);
+        }
     </style>
 </head>
 <body>
-    <div class="container mt-4">
+    <div class="container-fluid mt-4">
         <!-- Save Indicator -->
         <div id="saveIndicator" class="save-indicator"></div>
         
@@ -81,10 +121,6 @@
                     <button id="saveBtn" class="btn btn-success me-2">
                         <i class="bi bi-save me-2"></i>
                         Kaydet
-                    </button>
-                    <button id="viewPdfBtn" class="btn btn-info me-2">
-                        <i class="bi bi-file-pdf me-2"></i>
-                        PDF Görüntüle
                     </button>
                     <a href="{{ url_for('download_file', filename=json_filename) }}" 
                        class="btn btn-primary me-2">
@@ -109,88 +145,125 @@
             </div>
         </div>
 
-        <!-- Document Title -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="bi bi-file-text me-2"></i>
-                    Mevzuat Başlığı
-                </h5>
-            </div>
-            <div class="card-body">
-                <h4 class="text-primary editable" 
-                    contenteditable="true" 
-                    data-field="title"
-                    id="documentTitle">{{ result.mevzuat_basligi }}</h4>
-            </div>
-        </div>
-
-        <!-- Articles -->
-        <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">
-                    <i class="bi bi-list-ol me-2"></i>
-                    Maddeler
-                </h5>
-                <button id="addArticleBtn" class="btn btn-outline-success btn-sm">
-                    <i class="bi bi-plus-circle me-2"></i>
-                    Yeni Madde Ekle
-                </button>
-            </div>
-            <div class="card-body">
-                <div id="articlesContainer">
-                    {% for madde in result.maddeler %}
-                        <div class="article-item" data-article-index="{{ loop.index0 }}">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <div class="d-flex align-items-center">
-                                    <i class="bi bi-grip-vertical drag-handle me-2"></i>
-                                    <h6 class="mb-0 editable" 
-                                        contenteditable="true" 
-                                        data-field="article-title"
-                                        data-article-index="{{ loop.index0 }}">{{ madde.madde_numarasi }}</h6>
-                                </div>
-                                <div class="action-buttons">
-                                    <button class="btn btn-outline-primary btn-sm me-2 add-paragraph-btn" 
-                                            data-article-index="{{ loop.index0 }}">
-                                        <i class="bi bi-plus me-1"></i>
-                                        Fıkra Ekle
-                                    </button>
-                                    <button class="btn btn-outline-danger btn-sm delete-article-btn" 
-                                            data-article-index="{{ loop.index0 }}">
-                                        <i class="bi bi-trash me-1"></i>
-                                        Sil
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="paragraphs-container" data-article-index="{{ loop.index0 }}">
-                                    {% for fikra in madde.fikralar %}
-                                        <div class="paragraph-item" data-paragraph-index="{{ loop.index0 }}">
-                                            <div class="d-flex justify-content-between align-items-start">
-                                                <div class="flex-grow-1">
-                                                    <i class="bi bi-grip-vertical drag-handle me-2"></i>
-                                                    <span class="badge bg-info me-2">{{ loop.index }}</span>
-                                                    <div class="editable d-inline-block" 
-                                                         contenteditable="true" 
-                                                         data-field="paragraph"
-                                                         data-article-index="{{ loop.index0 }}"
-                                                         data-paragraph-index="{{ loop.index0 }}"
-                                                         style="min-width: 200px;">{{ fikra }}</div>
-                                                </div>
-                                                <div class="action-buttons ms-2">
-                                                    <button class="btn btn-outline-danger btn-sm delete-paragraph-btn" 
-                                                            data-article-index="{{ loop.index0 }}"
-                                                            data-paragraph-index="{{ loop.index0 }}">
-                                                        <i class="bi bi-trash"></i>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    {% endfor %}
-                                </div>
-                            </div>
+        <!-- Split Layout: PDF Viewer + Editor -->
+        <div class="split-layout">
+            <!-- PDF Panel -->
+            <div class="pdf-panel">
+                <div class="pdf-viewer-container">
+                    <div class="pdf-viewer-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-file-pdf me-2"></i>
+                            <span id="pdfFileName">
+                                {% if result._metadata and result._metadata.file_type == 'pdf' %}
+                                    {{ result._metadata.original_filename }}
+                                {% else %}
+                                    Orijinal Dosya
+                                {% endif %}
+                            </span>
+                        </h6>
+                    </div>
+                    {% if result._metadata and result._metadata.file_type == 'pdf' %}
+                        <iframe id="pdfViewer" 
+                                class="pdf-iframe"
+                                src="/view-pdf/{{ json_filename }}">
+                        </iframe>
+                    {% else %}
+                        <div class="no-pdf-message">
+                            <i class="bi bi-file-earmark-text display-4 mb-3"></i>
+                            <h5>PDF Mevcut Değil</h5>
+                            <p>Bu dosya PDF formatında değil veya görüntülenemiyor.</p>
+                            <small class="text-muted">Dosya Türü: {{ result._metadata.file_type if result._metadata else 'Bilinmiyor' }}</small>
                         </div>
-                    {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Edit Panel -->
+            <div class="edit-panel">
+                <!-- Document Title -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-file-text me-2"></i>
+                            Mevzuat Başlığı
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <h4 class="text-primary editable" 
+                            contenteditable="true" 
+                            data-field="title"
+                            id="documentTitle">{{ result.mevzuat_basligi }}</h4>
+                    </div>
+                </div>
+
+                <!-- Articles -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-list-ol me-2"></i>
+                            Maddeler
+                        </h5>
+                        <button id="addArticleBtn" class="btn btn-outline-success btn-sm">
+                            <i class="bi bi-plus-circle me-2"></i>
+                            Yeni Madde Ekle
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="articlesContainer">
+                            {% for madde in result.maddeler %}
+                                <div class="article-item" data-article-index="{{ loop.index0 }}">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-grip-vertical drag-handle me-2"></i>
+                                            <h6 class="mb-0 editable" 
+                                                contenteditable="true" 
+                                                data-field="article-title"
+                                                data-article-index="{{ loop.index0 }}">{{ madde.madde_numarasi }}</h6>
+                                        </div>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-outline-primary btn-sm me-2 add-paragraph-btn" 
+                                                    data-article-index="{{ loop.index0 }}">
+                                                <i class="bi bi-plus me-1"></i>
+                                                Fıkra Ekle
+                                            </button>
+                                            <button class="btn btn-outline-danger btn-sm delete-article-btn" 
+                                                    data-article-index="{{ loop.index0 }}">
+                                                <i class="bi bi-trash me-1"></i>
+                                                Sil
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="paragraphs-container" data-article-index="{{ loop.index0 }}">
+                                            {% for fikra in madde.fikralar %}
+                                                <div class="paragraph-item" data-paragraph-index="{{ loop.index0 }}">
+                                                    <div class="d-flex justify-content-between align-items-start">
+                                                        <div class="flex-grow-1">
+                                                            <i class="bi bi-grip-vertical drag-handle me-2"></i>
+                                                            <span class="badge bg-info me-2">{{ loop.index }}</span>
+                                                            <div class="editable d-inline-block" 
+                                                                 contenteditable="true" 
+                                                                 data-field="paragraph"
+                                                                 data-article-index="{{ loop.index0 }}"
+                                                                 data-paragraph-index="{{ loop.index0 }}"
+                                                                 style="min-width: 200px;">{{ fikra }}</div>
+                                                        </div>
+                                                        <div class="action-buttons ms-2">
+                                                            <button class="btn btn-outline-danger btn-sm delete-paragraph-btn" 
+                                                                    data-article-index="{{ loop.index0 }}"
+                                                                    data-paragraph-index="{{ loop.index0 }}">
+                                                                <i class="bi bi-trash"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -259,9 +332,7 @@
         const saveBtn = document.getElementById('saveBtn');
         const saveIndicator = document.getElementById('saveIndicator');
         const backBtn = document.getElementById('backBtn');
-        const viewPdfBtn = document.getElementById('viewPdfBtn');
         const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
-        const pdfModal = new bootstrap.Modal(document.getElementById('pdfModal'));
         
         // Auto-save functionality
         let saveTimeout;
@@ -372,17 +443,7 @@
             }
         });
         
-        // PDF viewer functionality
-        viewPdfBtn.addEventListener('click', function() {
-            if (documentData._metadata && documentData._metadata.file_type === 'pdf') {
-                const pdfUrl = `/view-pdf/${jsonFilename}`;
-                document.getElementById('pdfViewer').src = pdfUrl;
-                document.getElementById('pdfFileName').textContent = documentData._metadata.original_filename;
-                pdfModal.show();
-            } else {
-                showSaveIndicator('PDF dosyası bulunamadı. Sadece PDF dosyaları görüntülenebilir.', 'warning');
-            }
-        });
+        // PDF is now displayed inline, no modal needed
         
         // Add new article
         document.getElementById('addArticleBtn').addEventListener('click', function() {
