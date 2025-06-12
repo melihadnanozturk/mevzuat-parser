@@ -17,8 +17,11 @@ class DocumentParser:
             r'(?:^|\n)\s*(\d+)\s*\.\s*(?:MADDE|Madde)\s*[–\-:]?\s*'
         ]
         
-        # Pattern for paragraph markers
-        self.paragraph_pattern = r'^\s*\((\d+)\)\s*'
+        # Pattern for numbered paragraph markers (main paragraphs)
+        self.main_paragraph_pattern = r'^\s*(\d+)\)\s*'
+        
+        # Pattern for lettered sub-items
+        self.sub_item_pattern = r'^\s*([a-z])\)\s*'
         
         # Patterns for subject headers that should be excluded from paragraphs
         self.subject_header_patterns = [
@@ -266,71 +269,60 @@ class DocumentParser:
         return articles
     
     def _extract_paragraphs(self, article_content: str) -> List[str]:
-        """Extract paragraphs from article content."""
+        """Extract paragraphs from article content with proper numbered paragraph and sub-item handling."""
         paragraphs = []
         
-        # Split by double newlines first to get potential paragraphs
-        sections = re.split(r'\n\s*\n', article_content)
+        # Process all lines together to maintain order
+        lines = article_content.split('\n')
+        current_paragraph = []
         
-        for section in sections:
-            section = section.strip()
-            if not section:
+        for line in lines:
+            line = line.strip()
+            if not line:
                 continue
             
-            # Check if this section has numbered paragraphs
-            lines = section.split('\n')
-            current_paragraph = []
+            # Skip subject headers
+            if self._is_subject_header(line):
+                self.logger.debug(f"Skipping subject header: {line}")
+                continue
             
-            for line in lines:
-                line = line.strip()
-                if not line:
-                    continue
+            # Check if line starts with numbered paragraph marker like "1)", "2)", etc.
+            main_paragraph_match = re.match(self.main_paragraph_pattern, line)
+            
+            if main_paragraph_match:
+                # Save previous paragraph if exists
+                if current_paragraph:
+                    paragraph_text = ' '.join(current_paragraph).strip()
+                    if paragraph_text and not self._is_subject_header(paragraph_text):
+                        paragraphs.append(paragraph_text)
                 
-                # Skip subject headers
-                if self._is_subject_header(line):
-                    self.logger.debug(f"Skipping subject header: {line}")
-                    continue
+                # Start new main paragraph
+                current_paragraph = [line]
                 
-                # Check if line starts with paragraph marker like "(1)", "(2)", etc.
-                paragraph_match = re.match(self.paragraph_pattern, line)
+            else:
+                # Check if line starts with lettered sub-item like "a)", "b)", etc.
+                sub_item_match = re.match(self.sub_item_pattern, line)
                 
-                if paragraph_match:
-                    # Save previous paragraph if exists
+                if sub_item_match:
+                    # This is a sub-item, add it to current paragraph
                     if current_paragraph:
-                        paragraph_text = ' '.join(current_paragraph).strip()
-                        if paragraph_text and not self._is_subject_header(paragraph_text):
-                            paragraphs.append(paragraph_text)
-                        current_paragraph = []
-                    
-                    # Start new paragraph (remove the number marker)
-                    line = re.sub(self.paragraph_pattern, '', line).strip()
-                    if line and not self._is_subject_header(line):
+                        current_paragraph.append(line)
+                    else:
+                        # If no current paragraph, treat as standalone content
                         current_paragraph = [line]
                 else:
-                    # Continue current paragraph
-                    current_paragraph.append(line)
-            
-            # Add the last paragraph
-            if current_paragraph:
-                paragraph_text = ' '.join(current_paragraph).strip()
-                if paragraph_text and not self._is_subject_header(paragraph_text):
-                    paragraphs.append(paragraph_text)
+                    # This is continuation text, add to current paragraph
+                    if current_paragraph:
+                        current_paragraph.append(line)
+                    else:
+                        # If no current paragraph, start a new one
+                        current_paragraph = [line]
         
-        # If no numbered paragraphs found, process the content line by line
-        if not paragraphs and article_content.strip():
-            lines = article_content.split('\n')
-            filtered_lines = []
-            
-            for line in lines:
-                line = line.strip()
-                if line and not self._is_subject_header(line):
-                    filtered_lines.append(line)
-            
-            if filtered_lines:
-                # Join non-header lines into paragraphs
-                clean_content = ' '.join(filtered_lines)
-                if clean_content:
-                    paragraphs.append(clean_content)
+        # Add the last paragraph
+        if current_paragraph:
+            paragraph_text = ' '.join(current_paragraph).strip()
+            if paragraph_text and not self._is_subject_header(paragraph_text):
+                paragraphs.append(paragraph_text)
         
         return paragraphs
     

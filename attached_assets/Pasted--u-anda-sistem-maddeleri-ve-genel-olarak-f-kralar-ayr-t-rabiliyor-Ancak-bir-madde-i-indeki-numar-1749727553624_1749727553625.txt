@@ -1,0 +1,41 @@
+Şu anda sistem maddeleri ve genel olarak fıkraları ayrıştırabiliyor. Ancak, bir madde içindeki numaralandırılmış fıkralar (örn: "1)", "2)") ve bu fıkraların alt bentleri olarak kabul edilebilecek harflendirilmiş kısımlar (örn: "a)", "b)") arasındaki ilişki tam olarak istenen şekilde kurulmuyor olabilir.
+
+İSTENEN İYİLEŞTİRME:
+Python'daki dosya ayrıştırma (parsing) fonksiyonlarında, özellikle bir madde içeriğindeki fıkraların tespit edilme mantığını aşağıdaki şekilde güncellemeni istiyorum:
+
+1.  **Ana Fıkra Tespiti (Numaralı Bentler):**
+    *   Bir madde metni içerisinde, satır başında `\s*\d+\)\s*` (yani boşluklar, bir veya daha fazla rakam, bir kapatma parantezi, boşluklar) düzenli ifadesiyle eşleşen bir satır bulunduğunda, bu satır yeni bir **ana fıkranın** başlangıcı olarak kabul edilmelidir.
+    *   Her bir ana fıkra (numaralı bent), JSON çıktısındaki ilgili maddenin `fikralar` dizisine **yeni bir string elemanı** olarak eklenmelidir.
+
+2.  **Alt Bentlerin ve Devam Metinlerinin İşlenmesi (Harfli Bentler ve Diğer Satırlar):**
+    *   Bir ana fıkra (numaralı bent) tespit edildikten sonra, bir sonraki ana fıkra (yeni bir numaralı bent) tespit edilene kadar gelen:
+        *   Satır başında `\s*[a-z]\)\s*` (yani boşluklar, bir küçük harf, bir kapatma parantezi, boşluklar) düzenli ifadesiyle eşleşen satırlar (örneğin "a) ...", "b) ..."),
+        *   Veya herhangi bir özel fıkra başlangıç işareti (numara veya harf) olmayan düz metin satırları,
+        en son tespit edilen **ana fıkranın metnine dahil edilmeli (append edilmeli)**. Bu tür satırlar, `fikralar` dizisinde yeni bir eleman OLUŞTURMAMALIDIR. Bunlar, mevcut ana fıkranın devamı niteliğindedir.
+
+3.  **Örnek Senaryo ve İstenen Çıktı Mantığı:**
+    Aşağıdaki gibi bir madde metni varsayalım:
+    ```
+    Madde 5- 1) Danışmanlık talebinde bulunacak olan öğretim üyesinin Uzmanlık Alan Dersi açılmış olması gerekmektedir.
+    2) Doktora veya Sanatta Yeterlik programlarında tez veya Sanatta Yeterlik çalışması yapan öğrenciye danışman olacak öğretim üyesi en az bir tamamlanmış “Yüksek Lisans Tezi’’ yönetmiş olmalıdır. Ortak danışman olarak yönetilmiş yüksek lisans tezleri doktora/sanatta yeterlik tez danışmanlığı için geçerli değildir.
+    3) Danışman olarak atanacak Öğretim Üyesi aşağıdaki kriterlerden en az birini karşılamalıdır. Aşağıdaki çalışmalar Yüksek Öğretim Bilgi Sisteminden çekilir ve veri tabanında bilgileri eksik olan öğretim üyesine yeni bir danışmanlık verilmez.
+    a) Son üç yıl içerisinde SCI, SSCI, SCI-Exp veya AHCI kapsamı bilimsel dergilerde en az bir makale yayımlamak,
+    b) Son beş yıl içerisinde alanında alınmış en az bir patent sahibi olmak veya son üç yıl içerisinde patent başvurusunda bulunmak,
+    c) Son iki yıl içerisinde ESCI veya SCOPUS kapsamındaki bilimsel dergilerde en az bir makale yayımlamak,
+    ```
+    Bu metin için "Madde 5" in `fikralar` listesi şu şekilde olmalıdır:
+    ```json
+    "fikralar": [
+      "1) Danışmanlık talebinde bulunacak olan öğretim üyesinin Uzmanlık Alan Dersi açılmış olması gerekmektedir.",
+      "2) Doktora veya Sanatta Yeterlik programlarında tez veya Sanatta Yeterlik çalışması yapan öğrenciye danışman olacak öğretim üyesi en az bir tamamlanmış “Yüksek Lisans Tezi’’ yönetmiş olmalıdır. Ortak danışman olarak yönetilmiş yüksek lisans tezleri doktora/sanatta yeterlik tez danışmanlığı için geçerli değildir.",
+      "3) Danışman olarak atanacak Öğretim Üyesi aşağıdaki kriterlerden en az birini karşılamalıdır. Aşağıdaki çalışmalar Yüksek Öğretim Bilgi Sisteminden çekilir ve veri tabanında bilgileri eksik olan öğretim üyesine yeni bir danışmanlık verilmez. a) Son üç yıl içerisinde SCI, SSCI, SCI-Exp veya AHCI kapsamı bilimsel dergilerde en az bir makale yayımlamak, b) Son beş yıl içerisinde alanında alınmış en az bir patent sahibi olmak veya son üç yıl içerisinde patent başvurusunda bulunmak, c) Son iki yıl içerisinde ESCI veya SCOPUS kapsamındaki bilimsel dergilerde en az bir makale yayımlamak,"
+    ]
+    ```
+    Dikkat: "a)", "b)", "c)" ile başlayan kısımlar, "3)" ile başlayan fıkra metninin sonuna eklenmiştir ve `fikralar` listesinde ayrı elemanlar olarak yer almamıştır.
+
+4.  **Ara Başlıkların Hariç Tutulması Kuralı Geçerlidir:** Daha önceki iyileştirmemizde belirttiğimiz gibi, "Dayanak", "Amaç", "Kapsam", "Tanımlar" gibi madde içi ara başlıkların fıkra olarak alınmaması kuralı bu yeni mantıkla birlikte de geçerliliğini korumalıdır.
+
+LÜTFEN İSTENENLER:
+*   Mevcut Python ayrıştırma kodundaki ilgili fıkra tespit ve işleme fonksiyon(lar)ını bu yeni ve detaylı mantığa göre güncelle.
+
+Özetle, hedefimiz, bir madde içindeki numaralı fıkraları ayrı elemanlar olarak `fikralar` listesine almak, harfli alt bentleri ve düz metin devamlarını ise ait oldukları numaralı fıkranın metnine birleştirmektir.
