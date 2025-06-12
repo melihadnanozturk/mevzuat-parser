@@ -31,8 +31,21 @@ class DocumentParser:
         
         # Patterns for subject headers that should be excluded from paragraphs
         self.subject_header_patterns = [
+            # Combined patterns (Dayanak/Amaç/Kapsam combinations)
             r'^\s*(?:DAYANAK|dayanak)\s*(?:/|\|)?\s*(?:AMAÇ|amaç)\s*(?:/|\|)?\s*(?:KAPSAM|kapsam)?\s*$',
+            r'^\s*(?:AMAÇ|amaç)\s*(?:/|\|)?\s*(?:KAPSAM|kapsam)\s*$',
+            r'^\s*(?:DAYANAK|dayanak)\s*(?:/|\|)?\s*(?:KAPSAM|kapsam)\s*$',
+            
+            # Individual basic headers
+            r'^\s*(?:DAYANAK|dayanak)\s*$',
+            r'^\s*(?:AMAÇ|amaç)\s*$',
+            r'^\s*(?:KAPSAM|kapsam)\s*$',
+            r'^\s*(?:YÜRÜRLÜK|yürürlük)\s*$',
+            
+            # Definition related headers
             r'^\s*(?:TANIM|tanım|TANIMLAR|tanımlar|TARİF|tarif|TARİFLER|tarifler)\s*$',
+            
+            # Advisor related headers
             r'^\s*(?:DANIŞMAN|danışman)\s*$',
             r'^\s*(?:DANIŞMANLIK|danışmanlık)\s+(?:KRİTERLERİ|kriterleri)\s*$',
             r'^\s*(?:DANIŞMANIN|danışmanın)\s+(?:GÖREVLERİ|görevleri)\s*$',
@@ -41,17 +54,36 @@ class DocumentParser:
             r'^\s*(?:DANIŞMAN|danışman)\s+(?:DEĞİŞİKLİĞİ|değişikliği)\s*$',
             r'^\s*(?:ZORUNLU|zorunlu)\s+(?:HALLERDE|hallerde)\s+(?:DANIŞMAN|danışman)\s+(?:DEĞİŞİKLİĞİ|değişikliği)\s*$',
             r'^\s*(?:İKİNCİ|ikinci)\s+(?:TEZ|tez)\s+(?:DANIŞMANI|danışmanı)\s+(?:ATAMA|atama)\s*(?:\(.*\))?\s*$',
-            r'^\s*(?:YÜRÜRLÜK|yürürlük)\s*$',
-            r'^\s*(?:AMAÇ|amaç)\s*$',
-            r'^\s*(?:KAPSAM|kapsam)\s*$',
-            r'^\s*(?:DAYANAK|dayanak)\s*$',
-            r'^\s*(?:BAŞVURU|başvuru)\s*(?:ŞARTLARI|şartları)?\s*$',
+            
+            # Application and evaluation headers
+            r'^\s*(?:BAŞVURU|başvuru)\s*(?:ŞARTLARI|şartları|KOŞULLARI|koşulları)?\s*$',
+            r'^\s*(?:BAŞVURU|başvuru)\s+(?:KOŞULLARI|koşulları)\s+(?:VE|ve)\s+(?:KONTENJAN|kontenjan)\s+(?:BELİRLENMESİ|belirlenmesi)\s*$',
+            r'^\s*(?:BAŞVURULARIN|başvuruların)\s+(?:DEĞERLENDİRİLMESİ|değerlendirilmesi)\s+(?:VE|ve)\s+(?:İLANI|ilanı)\s*$',
             r'^\s*(?:UYGULAMA|uygulama)\s*(?:ESASLARI|esasları)?\s*$',
             r'^\s*(?:DEĞERLENDIRME|değerlendirme)\s*(?:KRİTERLERİ|kriterleri)?\s*$',
+            
+            # Organizational headers
+            r'^\s*(?:PERSONEL|personel)\s+(?:İHTİYACI|ihtiyacı)\s*$',
+            r'^\s*(?:YÖNETİM|yönetim)\s+(?:KURULUNUN|kurulunun)\s+(?:GÖREVLERİ|görevleri)\s*$',
+            r'^\s*(?:MERKEZİN|merkezin)\s+(?:AMAÇLARI|amaçları)\s*$',
+            r'^\s*(?:MERKEZİN|merkezin)\s+(?:AMAÇLARI|amaçları)\s+(?:VE|ve)\s+(?:FAALİYET|faaliyet)\s+(?:ALANLARI|alanları)\s*$',
+            
+            # Legal provisions headers
             r'^\s*(?:İLGİLİ|ilgili)\s+(?:MEVZUAT|mevzuat)\s*$',
             r'^\s*(?:GENEL|genel)\s+(?:HÜKÜMLER|hükümler)\s*$',
             r'^\s*(?:ÖZEL|özel)\s+(?:HÜKÜMLER|hükümler)\s*$',
-            r'^\s*(?:SON|son)\s+(?:HÜKÜMLER|hükümler)\s*$'
+            r'^\s*(?:SON|son)\s+(?:HÜKÜMLER|hükümler)\s*$',
+            r'^\s*(?:ÇEŞİTLİ|çeşitli)\s+(?:VE|ve)\s+(?:SON|son)\s+(?:HÜKÜMLER|hükümler)\s*$',
+            
+            # Section headers
+            r'^\s*(?:BİRİNCİ|birinci|İKİNCİ|ikinci|ÜÇÜNCÜ|üçüncü|DÖRDÜNCÜ|dördüncü|BEŞİNCİ|beşinci)\s+(?:BÖLÜM|bölüm)\s*$',
+            
+            # Common ending patterns that indicate non-paragraph content
+            r'^\s*.+\s+(?:yapılmaz|alınabilir|eder|olur|edilir)\.\s*$',
+            
+            # Patterns with bold or special formatting indicators
+            r'^\s*\*\*.*\*\*\s*$',  # Bold text indicators
+            r'^\s*_.*_\s*$',        # Italic text indicators
         ]
         
     def _is_subject_header(self, line: str) -> bool:
@@ -67,23 +99,47 @@ class DocumentParser:
             if re.match(pattern, line, re.IGNORECASE):
                 return True
         
-        # Additional heuristics for subject headers
-        # Check if line is short (less than 50 chars), mostly uppercase, and doesn't end with punctuation
-        if (len(line) < 50 and 
+        # Enhanced heuristics for subject headers
+        
+        # Check if line is short and mostly uppercase (typical header formatting)
+        if (len(line) < 60 and 
             line.isupper() and 
-            not line.endswith(('.', ':', ';', '!', '?')) and
-            not re.search(r'\d', line)):  # No numbers
+            not line.endswith(('.', ';', '!', '?')) and
+            not re.search(r'\d+\)', line) and  # Not a numbered paragraph
+            not re.search(r'\(\d+\)', line)):  # Not a numbered paragraph
             return True
             
-        # Check if line contains common subject header words and is relatively short
+        # Check for common subject header keywords with improved detection
         subject_keywords = [
-            'dayanak', 'amaç', 'kapsam', 'tanım', 'danışman', 'yürürlük', 
-            'başvuru', 'uygulama', 'değerlendirme', 'genel', 'özel', 'son'
+            'dayanak', 'amaç', 'kapsam', 'tanım', 'tanımlar', 'danışman', 'yürürlük', 
+            'başvuru', 'uygulama', 'değerlendirme', 'genel', 'özel', 'son',
+            'personel', 'yönetim', 'merkez', 'bölüm', 'kriterleri', 'görevleri',
+            'atama', 'değişiklik', 'koşulları', 'belirlenmesi', 'ilanı'
         ]
         
-        if (len(line) < 80 and 
+        # Enhanced keyword-based detection with stricter criteria
+        if (len(line) < 100 and 
             any(keyword in line.lower() for keyword in subject_keywords) and
-            len(line.split()) <= 5):  # Maximum 5 words
+            len(line.split()) <= 8 and  # Maximum 8 words for headers
+            not re.search(r'\d+\)', line) and  # Not a numbered paragraph
+            not re.search(r'\(\d+\)', line)):  # Not a numbered paragraph
+            return True
+            
+        # Check for lines that end with specific patterns indicating they are headers, not content
+        header_ending_patterns = [
+            r'^\s*.+\s+(?:yapılmaz|alınabilir|eder|olur|edilir)\s*\.?\s*$',
+            r'^\s*.+\s+(?:belirlenir|düzenlenir|uygulanır|yapılır)\s*\.?\s*$',
+            r'^\s*.+\s+(?:sona\s+erer|kabul\s+edilir|değerlendirilir)\s*\.?\s*$'
+        ]
+        
+        for pattern in header_ending_patterns:
+            if re.match(pattern, line, re.IGNORECASE) and len(line) < 120:
+                return True
+                
+        # Check for standalone parenthetical content or metadata
+        if (re.match(r'^\s*\([^)]+\)\s*$', line) and 
+            len(line) < 150 and
+            ('tarih' in line.lower() or 'sayı' in line.lower() or 'karar' in line.lower())):
             return True
             
         return False
