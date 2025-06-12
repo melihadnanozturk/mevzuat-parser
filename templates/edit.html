@@ -163,10 +163,41 @@
                         </h6>
                     </div>
                     {% if result.get('_metadata') and result._metadata.get('file_type') == 'pdf' %}
-                        <iframe id="pdfViewer" 
-                                class="pdf-iframe"
-                                src="/view-pdf/{{ json_filename }}">
-                        </iframe>
+                        <div id="pdfViewerContainer" class="pdf-iframe">
+                            <div class="pdf-controls p-2 border-bottom d-flex justify-content-between align-items-center bg-light">
+                                <div>
+                                    <button id="prevPage" class="btn btn-sm btn-outline-secondary me-1">
+                                        <i class="bi bi-chevron-left"></i>
+                                    </button>
+                                    <span id="pageInfo" class="mx-2 small">Sayfa: 1 / 1</span>
+                                    <button id="nextPage" class="btn btn-sm btn-outline-secondary me-2">
+                                        <i class="bi bi-chevron-right"></i>
+                                    </button>
+                                </div>
+                                <div>
+                                    <button id="zoomOut" class="btn btn-sm btn-outline-secondary me-1">
+                                        <i class="bi bi-zoom-out"></i>
+                                    </button>
+                                    <span id="zoomLevel" class="mx-2 small">100%</span>
+                                    <button id="zoomIn" class="btn btn-sm btn-outline-secondary me-2">
+                                        <i class="bi bi-zoom-in"></i>
+                                    </button>
+                                    <button id="openPdfNewTab" class="btn btn-sm btn-primary">
+                                        <i class="bi bi-box-arrow-up-right"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="pdfCanvas" class="overflow-auto" style="height: calc(100% - 60px);">
+                                <div class="d-flex justify-content-center align-items-center h-100" id="pdfLoadingIndicator">
+                                    <div class="text-center">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Yükleniyor...</span>
+                                        </div>
+                                        <p class="mt-2 text-muted">PDF yükleniyor...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     {% else %}
                         <div class="no-pdf-message">
                             <i class="bi bi-file-earmark-text display-4 mb-3"></i>
@@ -320,6 +351,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <!-- Data transfer -->
     <script type="application/json" id="documentData">{{ result | tojson_utf8 | safe }}</script>
     
@@ -443,13 +475,145 @@
             }
         });
         
-        // PDF is now displayed inline, no modal needed
-        // Debug metadata
+        // PDF debugging and setup
         console.log('Document data:', documentData);
         console.log('Metadata:', documentData._metadata);
         if (documentData._metadata) {
             console.log('File type:', documentData._metadata.file_type);
             console.log('Original filename:', documentData._metadata.original_filename);
+        }
+        
+        // PDF.js setup and handling
+        let pdfDoc = null;
+        let pageNum = 1;
+        let pageCount = 0;
+        let scale = 1.2;
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // PDF viewer elements
+        const pdfCanvas = document.getElementById('pdfCanvas');
+        const loadingIndicator = document.getElementById('pdfLoadingIndicator');
+        const pageInfo = document.getElementById('pageInfo');
+        const prevPageBtn = document.getElementById('prevPage');
+        const nextPageBtn = document.getElementById('nextPage');
+        const zoomInBtn = document.getElementById('zoomIn');
+        const zoomOutBtn = document.getElementById('zoomOut');
+        const zoomLevel = document.getElementById('zoomLevel');
+        const openPdfBtn = document.getElementById('openPdfNewTab');
+        
+        if (pdfCanvas && documentData._metadata && documentData._metadata.file_type === 'pdf') {
+            // Configure PDF.js worker
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            
+            // Load the PDF
+            const pdfUrl = `/view-pdf/${jsonFilename}`;
+            console.log('Loading PDF from:', pdfUrl);
+            
+            pdfjsLib.getDocument(pdfUrl).promise.then(function(pdf) {
+                console.log('PDF loaded successfully');
+                pdfDoc = pdf;
+                pageCount = pdf.numPages;
+                
+                // Hide loading indicator
+                loadingIndicator.style.display = 'none';
+                
+                // Add canvas to container
+                canvas.style.display = 'block';
+                canvas.style.margin = '0 auto';
+                pdfCanvas.appendChild(canvas);
+                
+                // Render first page
+                renderPage(pageNum);
+                
+                // Update UI
+                updatePageInfo();
+                updateZoomLevel();
+                
+            }).catch(function(error) {
+                console.error('Error loading PDF:', error);
+                loadingIndicator.innerHTML = `
+                    <div class="text-center">
+                        <i class="bi bi-exclamation-triangle display-4 mb-3 text-danger"></i>
+                        <h5>PDF Yüklenemedi</h5>
+                        <p>PDF dosyası yüklenirken bir hata oluştu.</p>
+                        <button class="btn btn-primary" onclick="window.open('/view-pdf/${jsonFilename}', '_blank')">
+                            <i class="bi bi-box-arrow-up-right me-2"></i>
+                            Yeni Sekmede Aç
+                        </button>
+                    </div>
+                `;
+            });
+            
+            // PDF control functions
+            function renderPage(num) {
+                pdfDoc.getPage(num).then(function(page) {
+                    const viewport = page.getViewport({scale: scale});
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    
+                    const renderContext = {
+                        canvasContext: ctx,
+                        viewport: viewport
+                    };
+                    
+                    page.render(renderContext);
+                });
+            }
+            
+            function updatePageInfo() {
+                if (pageInfo) {
+                    pageInfo.textContent = `Sayfa: ${pageNum} / ${pageCount}`;
+                }
+            }
+            
+            function updateZoomLevel() {
+                if (zoomLevel) {
+                    zoomLevel.textContent = `${Math.round(scale * 100)}%`;
+                }
+            }
+            
+            // Event listeners
+            if (prevPageBtn) {
+                prevPageBtn.addEventListener('click', function() {
+                    if (pageNum <= 1) return;
+                    pageNum--;
+                    renderPage(pageNum);
+                    updatePageInfo();
+                });
+            }
+            
+            if (nextPageBtn) {
+                nextPageBtn.addEventListener('click', function() {
+                    if (pageNum >= pageCount) return;
+                    pageNum++;
+                    renderPage(pageNum);
+                    updatePageInfo();
+                });
+            }
+            
+            if (zoomInBtn) {
+                zoomInBtn.addEventListener('click', function() {
+                    scale += 0.2;
+                    renderPage(pageNum);
+                    updateZoomLevel();
+                });
+            }
+            
+            if (zoomOutBtn) {
+                zoomOutBtn.addEventListener('click', function() {
+                    if (scale <= 0.4) return;
+                    scale -= 0.2;
+                    renderPage(pageNum);
+                    updateZoomLevel();
+                });
+            }
+            
+            if (openPdfBtn) {
+                openPdfBtn.addEventListener('click', function() {
+                    window.open(`/view-pdf/${jsonFilename}`, '_blank');
+                });
+            }
         }
         
         // Add new article
