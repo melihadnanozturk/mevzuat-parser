@@ -73,11 +73,18 @@
             border: 1px solid var(--bs-border-color);
             border-radius: 8px;
             background: var(--bs-body-bg);
+            display: none;
+        }
+        .pdf-panel.show {
+            display: block;
         }
         .edit-panel {
             flex: 1;
             overflow-y: auto;
             max-height: calc(100vh - 200px);
+        }
+        .edit-panel.full-width {
+            flex: 1 1 100%;
         }
         .pdf-viewer-container {
             height: 100%;
@@ -122,6 +129,12 @@
                         <i class="bi bi-save me-2"></i>
                         Kaydet
                     </button>
+                    {% if result.get('_metadata') and result._metadata.get('file_type') == 'pdf' %}
+                    <button id="togglePdfBtn" class="btn btn-info me-2">
+                        <i class="bi bi-file-pdf me-2"></i>
+                        PDF Görüntüle
+                    </button>
+                    {% endif %}
                     <a href="{{ url_for('download_file', filename=json_filename) }}" 
                        class="btn btn-primary me-2">
                         <i class="bi bi-download me-2"></i>
@@ -210,7 +223,7 @@
             </div>
 
             <!-- Edit Panel -->
-            <div class="edit-panel">
+            <div class="edit-panel full-width" id="editPanel">
                 <!-- Document Title -->
                 <div class="card mb-4">
                     <div class="card-header">
@@ -483,26 +496,67 @@
             console.log('Original filename:', documentData._metadata.original_filename);
         }
         
+        // PDF viewer toggle functionality
+        const togglePdfBtn = document.getElementById('togglePdfBtn');
+        const pdfPanel = document.querySelector('.pdf-panel');
+        const editPanel = document.getElementById('editPanel');
+        let pdfVisible = false;
+        let pdfLoaded = false;
+        
         // PDF.js setup and handling
         let pdfDoc = null;
         let pageNum = 1;
         let pageCount = 0;
-        let scale = 1.2;
+        let scale = 1.0;
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
-        // PDF viewer elements
-        const pdfCanvas = document.getElementById('pdfCanvas');
-        const loadingIndicator = document.getElementById('pdfLoadingIndicator');
-        const pageInfo = document.getElementById('pageInfo');
-        const prevPageBtn = document.getElementById('prevPage');
-        const nextPageBtn = document.getElementById('nextPage');
-        const zoomInBtn = document.getElementById('zoomIn');
-        const zoomOutBtn = document.getElementById('zoomOut');
-        const zoomLevel = document.getElementById('zoomLevel');
-        const openPdfBtn = document.getElementById('openPdfNewTab');
+        if (togglePdfBtn && documentData._metadata && documentData._metadata.file_type === 'pdf') {
+            togglePdfBtn.addEventListener('click', function() {
+                if (!pdfVisible) {
+                    showPdfViewer();
+                } else {
+                    hidePdfViewer();
+                }
+            });
+        }
         
-        if (pdfCanvas && documentData._metadata && documentData._metadata.file_type === 'pdf') {
+        function showPdfViewer() {
+            pdfVisible = true;
+            pdfPanel.classList.add('show');
+            editPanel.classList.remove('full-width');
+            togglePdfBtn.innerHTML = '<i class="bi bi-x-lg me-2"></i>PDF Gizle';
+            togglePdfBtn.classList.remove('btn-info');
+            togglePdfBtn.classList.add('btn-warning');
+            
+            if (!pdfLoaded) {
+                loadPdf();
+            }
+        }
+        
+        function hidePdfViewer() {
+            pdfVisible = false;
+            pdfPanel.classList.remove('show');
+            editPanel.classList.add('full-width');
+            togglePdfBtn.innerHTML = '<i class="bi bi-file-pdf me-2"></i>PDF Görüntüle';
+            togglePdfBtn.classList.remove('btn-warning');
+            togglePdfBtn.classList.add('btn-info');
+        }
+        
+        function loadPdf() {
+            if (pdfLoaded) return;
+            
+            // PDF viewer elements
+            const pdfCanvas = document.getElementById('pdfCanvas');
+            const loadingIndicator = document.getElementById('pdfLoadingIndicator');
+            const pageInfo = document.getElementById('pageInfo');
+            const prevPageBtn = document.getElementById('prevPage');
+            const nextPageBtn = document.getElementById('nextPage');
+            const zoomInBtn = document.getElementById('zoomIn');
+            const zoomOutBtn = document.getElementById('zoomOut');
+            const zoomLevel = document.getElementById('zoomLevel');
+            const openPdfBtn = document.getElementById('openPdfNewTab');
+            
             // Configure PDF.js worker
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
             
@@ -514,13 +568,17 @@
                 console.log('PDF loaded successfully');
                 pdfDoc = pdf;
                 pageCount = pdf.numPages;
+                pdfLoaded = true;
                 
                 // Hide loading indicator
-                loadingIndicator.style.display = 'none';
+                if (loadingIndicator) {
+                    loadingIndicator.style.display = 'none';
+                }
                 
                 // Add canvas to container
                 canvas.style.display = 'block';
                 canvas.style.margin = '0 auto';
+                canvas.style.border = '1px solid #dee2e6';
                 pdfCanvas.appendChild(canvas);
                 
                 // Render first page
@@ -532,21 +590,25 @@
                 
             }).catch(function(error) {
                 console.error('Error loading PDF:', error);
-                loadingIndicator.innerHTML = `
-                    <div class="text-center">
-                        <i class="bi bi-exclamation-triangle display-4 mb-3 text-danger"></i>
-                        <h5>PDF Yüklenemedi</h5>
-                        <p>PDF dosyası yüklenirken bir hata oluştu.</p>
-                        <button class="btn btn-primary" onclick="window.open('/view-pdf/${jsonFilename}', '_blank')">
-                            <i class="bi bi-box-arrow-up-right me-2"></i>
-                            Yeni Sekmede Aç
-                        </button>
-                    </div>
-                `;
+                if (loadingIndicator) {
+                    loadingIndicator.innerHTML = `
+                        <div class="text-center">
+                            <i class="bi bi-exclamation-triangle display-4 mb-3 text-danger"></i>
+                            <h5>PDF Yüklenemedi</h5>
+                            <p>PDF dosyası yüklenirken bir hata oluştu.</p>
+                            <button class="btn btn-primary" onclick="window.open('/view-pdf/${jsonFilename}', '_blank')">
+                                <i class="bi bi-box-arrow-up-right me-2"></i>
+                                Yeni Sekmede Aç
+                            </button>
+                        </div>
+                    `;
+                }
             });
             
             // PDF control functions
             function renderPage(num) {
+                if (!pdfDoc) return;
+                
                 pdfDoc.getPage(num).then(function(page) {
                     const viewport = page.getViewport({scale: scale});
                     canvas.height = viewport.height;
@@ -557,13 +619,21 @@
                         viewport: viewport
                     };
                     
-                    page.render(renderContext);
+                    page.render(renderContext).promise.then(function() {
+                        console.log('Page rendered successfully');
+                    });
                 });
             }
             
             function updatePageInfo() {
                 if (pageInfo) {
                     pageInfo.textContent = `Sayfa: ${pageNum} / ${pageCount}`;
+                }
+                if (prevPageBtn) {
+                    prevPageBtn.disabled = pageNum <= 1;
+                }
+                if (nextPageBtn) {
+                    nextPageBtn.disabled = pageNum >= pageCount;
                 }
             }
             
