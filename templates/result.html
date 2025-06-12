@@ -6,6 +6,60 @@
     <title>İşlem Sonucu - Türk Mevzuat Çıkarıcı</title>
     <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .split-layout {
+            display: flex;
+            height: calc(100vh - 200px);
+            gap: 16px;
+        }
+        .pdf-panel {
+            flex: 0 0 50%;
+            border: 1px solid var(--bs-border-color);
+            border-radius: 8px;
+            background: var(--bs-body-bg);
+            display: none;
+        }
+        .pdf-panel.show {
+            display: block;
+        }
+        .content-panel {
+            flex: 1;
+            overflow-y: auto;
+            max-height: calc(100vh - 200px);
+        }
+        .content-panel.full-width {
+            flex: 1 1 100%;
+        }
+        .pdf-viewer-container {
+            height: 100%;
+            position: relative;
+        }
+        .pdf-viewer-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--bs-border-color);
+            background: var(--bs-body-secondary);
+            border-radius: 8px 8px 0 0;
+        }
+        .pdf-iframe {
+            width: 100%;
+            height: calc(100% - 60px);
+            border: none;
+            border-radius: 0 0 8px 8px;
+        }
+        .pdf-controls {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--bs-border-color);
+            background: var(--bs-light);
+        }
+        .no-pdf-message {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            flex-direction: column;
+            color: var(--bs-text-muted);
+        }
+    </style>
 </head>
 <body>
     <div class="container mt-4">
@@ -19,6 +73,12 @@
                             İşlem Tamamlandı
                         </h1>
                         <div>
+                            {% if result.get('_metadata') and result._metadata.get('file_type') == 'pdf' %}
+                            <button id="togglePdfBtn" class="btn btn-info me-2">
+                                <i class="bi bi-file-pdf me-2"></i>
+                                PDF Görüntüle
+                            </button>
+                            {% endif %}
                             <a href="{{ url_for('edit_document', json_filename=json_filename) }}" 
                                class="btn btn-primary me-2">
                                 <i class="bi bi-pencil-square me-2"></i>
@@ -43,7 +103,73 @@
                     </div>
                 </div>
 
-                <!-- Document Title -->
+                <!-- Split Layout: PDF Viewer + Content -->
+                <div class="split-layout">
+                    <!-- PDF Panel -->
+                    <div class="pdf-panel">
+                        <div class="pdf-viewer-container">
+                            <div class="pdf-viewer-header">
+                                <h6 class="mb-0">
+                                    <i class="bi bi-file-pdf me-2"></i>
+                                    <span id="pdfFileName">
+                                        {% if result.get('_metadata') and result._metadata.get('file_type') == 'pdf' %}
+                                            {{ result._metadata.original_filename }}
+                                        {% else %}
+                                            Orijinal Dosya
+                                        {% endif %}
+                                    </span>
+                                </h6>
+                            </div>
+                            {% if result.get('_metadata') and result._metadata.get('file_type') == 'pdf' %}
+                                <div id="pdfViewerContainer" class="pdf-iframe">
+                                    <div class="pdf-controls p-2 border-bottom d-flex justify-content-between align-items-center bg-light">
+                                        <div>
+                                            <button id="prevPage" class="btn btn-sm btn-outline-secondary me-1">
+                                                <i class="bi bi-chevron-left"></i>
+                                            </button>
+                                            <span id="pageInfo" class="mx-2 small">Sayfa: 1 / 1</span>
+                                            <button id="nextPage" class="btn btn-sm btn-outline-secondary me-2">
+                                                <i class="bi bi-chevron-right"></i>
+                                            </button>
+                                        </div>
+                                        <div>
+                                            <button id="zoomOut" class="btn btn-sm btn-outline-secondary me-1">
+                                                <i class="bi bi-zoom-out"></i>
+                                            </button>
+                                            <span id="zoomLevel" class="mx-2 small">100%</span>
+                                            <button id="zoomIn" class="btn btn-sm btn-outline-secondary me-2">
+                                                <i class="bi bi-zoom-in"></i>
+                                            </button>
+                                            <button id="openPdfNewTab" class="btn btn-sm btn-primary">
+                                                <i class="bi bi-box-arrow-up-right"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div id="pdfCanvas" class="overflow-auto" style="height: calc(100% - 60px);">
+                                        <div class="d-flex justify-content-center align-items-center h-100" id="pdfLoadingIndicator">
+                                            <div class="text-center">
+                                                <div class="spinner-border text-primary" role="status">
+                                                    <span class="visually-hidden">Yükleniyor...</span>
+                                                </div>
+                                                <p class="mt-2 text-muted">PDF yükleniyor...</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% else %}
+                                <div class="no-pdf-message">
+                                    <i class="bi bi-file-earmark-text display-4 mb-3"></i>
+                                    <h5>PDF Mevcut Değil</h5>
+                                    <p>Bu dosya PDF formatında değil veya görüntülenemiyor.</p>
+                                    <small class="text-muted">Dosya Türü: {{ result.get('_metadata', {}).get('file_type', 'Bilinmiyor') }}</small>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Content Panel -->
+                    <div class="content-panel full-width" id="contentPanel">
+                        <!-- Document Title -->
                 <div class="card mb-4">
                     <div class="card-header">
                         <h5 class="card-title mb-0">
@@ -153,11 +279,14 @@
                         </a>
                     </div>
                 </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>
         function copyToClipboard() {
             const jsonContent = document.getElementById('jsonContent').textContent;
@@ -177,6 +306,200 @@
             }).catch(function() {
                 alert('Kopyalama işlemi başarısız oldu.');
             });
+        }
+
+        // PDF viewer toggle functionality
+        const togglePdfBtn = document.getElementById('togglePdfBtn');
+        const pdfPanel = document.querySelector('.pdf-panel');
+        const contentPanel = document.getElementById('contentPanel');
+        let pdfVisible = false;
+        let pdfLoaded = false;
+        
+        // PDF.js setup and handling
+        let pdfDoc = null;
+        let pageNum = 1;
+        let pageCount = 0;
+        let scale = 1.0;
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Document data
+        const documentData = {{ result | tojson_utf8 | safe }};
+        const jsonFilename = "{{ json_filename }}";
+        
+        if (togglePdfBtn && documentData._metadata && documentData._metadata.file_type === 'pdf') {
+            togglePdfBtn.addEventListener('click', function() {
+                if (!pdfVisible) {
+                    showPdfViewer();
+                } else {
+                    hidePdfViewer();
+                }
+            });
+        }
+        
+        function showPdfViewer() {
+            pdfVisible = true;
+            pdfPanel.classList.add('show');
+            contentPanel.classList.remove('full-width');
+            togglePdfBtn.innerHTML = '<i class="bi bi-x-lg me-2"></i>PDF Gizle';
+            togglePdfBtn.classList.remove('btn-info');
+            togglePdfBtn.classList.add('btn-warning');
+            
+            if (!pdfLoaded) {
+                loadPdf();
+            }
+        }
+        
+        function hidePdfViewer() {
+            pdfVisible = false;
+            pdfPanel.classList.remove('show');
+            contentPanel.classList.add('full-width');
+            togglePdfBtn.innerHTML = '<i class="bi bi-file-pdf me-2"></i>PDF Görüntüle';
+            togglePdfBtn.classList.remove('btn-warning');
+            togglePdfBtn.classList.add('btn-info');
+        }
+        
+        function loadPdf() {
+            if (pdfLoaded) return;
+            
+            // PDF viewer elements
+            const pdfCanvas = document.getElementById('pdfCanvas');
+            const loadingIndicator = document.getElementById('pdfLoadingIndicator');
+            const pageInfo = document.getElementById('pageInfo');
+            const prevPageBtn = document.getElementById('prevPage');
+            const nextPageBtn = document.getElementById('nextPage');
+            const zoomInBtn = document.getElementById('zoomIn');
+            const zoomOutBtn = document.getElementById('zoomOut');
+            const zoomLevel = document.getElementById('zoomLevel');
+            const openPdfBtn = document.getElementById('openPdfNewTab');
+            
+            // Configure PDF.js worker
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            
+            // Load the PDF
+            const pdfUrl = `/view-pdf/${jsonFilename}`;
+            console.log('Loading PDF from:', pdfUrl);
+            
+            pdfjsLib.getDocument(pdfUrl).promise.then(function(pdf) {
+                console.log('PDF loaded successfully');
+                pdfDoc = pdf;
+                pageCount = pdf.numPages;
+                pdfLoaded = true;
+                
+                // Hide loading indicator
+                if (loadingIndicator) {
+                    loadingIndicator.style.display = 'none';
+                }
+                
+                // Add canvas to container
+                canvas.style.display = 'block';
+                canvas.style.margin = '0 auto';
+                canvas.style.border = '1px solid #dee2e6';
+                pdfCanvas.appendChild(canvas);
+                
+                // Render first page
+                renderPage(pageNum);
+                
+                // Update UI
+                updatePageInfo();
+                updateZoomLevel();
+                
+            }).catch(function(error) {
+                console.error('Error loading PDF:', error);
+                if (loadingIndicator) {
+                    loadingIndicator.innerHTML = `
+                        <div class="text-center">
+                            <i class="bi bi-exclamation-triangle display-4 mb-3 text-danger"></i>
+                            <h5>PDF Yüklenemedi</h5>
+                            <p>PDF dosyası yüklenirken bir hata oluştu.</p>
+                            <button class="btn btn-primary" onclick="window.open('/view-pdf/${jsonFilename}', '_blank')">
+                                <i class="bi bi-box-arrow-up-right me-2"></i>
+                                Yeni Sekmede Aç
+                            </button>
+                        </div>
+                    `;
+                }
+            });
+            
+            // PDF control functions
+            function renderPage(num) {
+                if (!pdfDoc) return;
+                
+                pdfDoc.getPage(num).then(function(page) {
+                    const viewport = page.getViewport({scale: scale});
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    
+                    const renderContext = {
+                        canvasContext: ctx,
+                        viewport: viewport
+                    };
+                    
+                    page.render(renderContext).promise.then(function() {
+                        console.log('Page rendered successfully');
+                    });
+                });
+            }
+            
+            function updatePageInfo() {
+                if (pageInfo) {
+                    pageInfo.textContent = `Sayfa: ${pageNum} / ${pageCount}`;
+                }
+                if (prevPageBtn) {
+                    prevPageBtn.disabled = pageNum <= 1;
+                }
+                if (nextPageBtn) {
+                    nextPageBtn.disabled = pageNum >= pageCount;
+                }
+            }
+            
+            function updateZoomLevel() {
+                if (zoomLevel) {
+                    zoomLevel.textContent = `${Math.round(scale * 100)}%`;
+                }
+            }
+            
+            // Event listeners
+            if (prevPageBtn) {
+                prevPageBtn.addEventListener('click', function() {
+                    if (pageNum <= 1) return;
+                    pageNum--;
+                    renderPage(pageNum);
+                    updatePageInfo();
+                });
+            }
+            
+            if (nextPageBtn) {
+                nextPageBtn.addEventListener('click', function() {
+                    if (pageNum >= pageCount) return;
+                    pageNum++;
+                    renderPage(pageNum);
+                    updatePageInfo();
+                });
+            }
+            
+            if (zoomInBtn) {
+                zoomInBtn.addEventListener('click', function() {
+                    scale += 0.2;
+                    renderPage(pageNum);
+                    updateZoomLevel();
+                });
+            }
+            
+            if (zoomOutBtn) {
+                zoomOutBtn.addEventListener('click', function() {
+                    if (scale <= 0.4) return;
+                    scale -= 0.2;
+                    renderPage(pageNum);
+                    updateZoomLevel();
+                });
+            }
+            
+            if (openPdfBtn) {
+                openPdfBtn.addEventListener('click', function() {
+                    window.open(`/view-pdf/${jsonFilename}`, '_blank');
+                });
+            }
         }
 
         // Auto-expand first article if there are articles
