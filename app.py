@@ -112,6 +112,40 @@ def upload_file():
         flash('Dosya yüklenirken hata oluştu.', 'error')
         return redirect(url_for('index'))
 
+@app.route('/edit/<json_filename>')
+def edit_document(json_filename):
+    """Edit document page with inline editing capabilities."""
+    try:
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], json_filename)
+        if os.path.exists(filepath):
+            with open(filepath, 'r', encoding='utf-8') as f:
+                result = json.load(f)
+            return render_template('edit.html', result=result, json_filename=json_filename)
+        else:
+            flash('Dosya bulunamadı', 'error')
+            return redirect(url_for('index'))
+    except Exception as e:
+        app.logger.error(f"Edit page error: {str(e)}")
+        flash('Dosya açılırken hata oluştu', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/save/<json_filename>', methods=['POST'])
+def save_document(json_filename):
+    """Save edited document data."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'Geçersiz veri'})
+        
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], json_filename)
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        
+        return jsonify({'success': True, 'message': 'Değişiklikler kaydedildi'})
+    except Exception as e:
+        app.logger.error(f"Save error: {str(e)}")
+        return jsonify({'success': False, 'message': 'Kaydetme hatası oluştu'})
+
 @app.route('/download/<filename>')
 def download_file(filename):
     """Download the generated JSON file."""

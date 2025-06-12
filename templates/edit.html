@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="tr" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mevzuat Düzenle - Türk Mevzuat Çıkarıcı</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .editable {
+            border: 1px solid transparent;
+            padding: 8px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+        .editable:hover {
+            border-color: var(--bs-info);
+            background-color: var(--bs-dark);
+        }
+        .editable:focus {
+            border-color: var(--bs-primary);
+            background-color: var(--bs-dark);
+            outline: none;
+        }
+        .article-item {
+            border: 1px solid var(--bs-border-color);
+            border-radius: 8px;
+            margin-bottom: 16px;
+            transition: all 0.3s ease;
+        }
+        .article-item:hover {
+            border-color: var(--bs-info);
+        }
+        .paragraph-item {
+            border: 1px solid var(--bs-border-color-translucent);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            padding: 12px;
+            transition: all 0.3s ease;
+        }
+        .paragraph-item:hover {
+            border-color: var(--bs-info);
+            background-color: var(--bs-body-bg);
+        }
+        .action-buttons {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .article-item:hover .action-buttons,
+        .paragraph-item:hover .action-buttons {
+            opacity: 1;
+        }
+        .save-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+        }
+        .drag-handle {
+            cursor: move;
+            color: var(--bs-secondary);
+        }
+        .drag-handle:hover {
+            color: var(--bs-primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <!-- Save Indicator -->
+        <div id="saveIndicator" class="save-indicator"></div>
+        
+        <!-- Header -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h1 class="card-title mb-0">
+                    <i class="bi bi-pencil-square me-2"></i>
+                    Mevzuat Düzenle
+                </h1>
+                <div>
+                    <button id="saveBtn" class="btn btn-success me-2">
+                        <i class="bi bi-save me-2"></i>
+                        Kaydet
+                    </button>
+                    <a href="{{ url_for('download_file', filename=json_filename) }}" 
+                       class="btn btn-primary me-2">
+                        <i class="bi bi-download me-2"></i>
+                        JSON İndir
+                    </a>
+                    <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left me-2"></i>
+                        Ana Sayfa
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-0">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Metinlere tıklayarak düzenleyebilir, madde ve fıkra ekleyip silebilirsiniz.
+                </p>
+            </div>
+        </div>
+
+        <!-- Document Title -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-file-text me-2"></i>
+                    Mevzuat Başlığı
+                </h5>
+            </div>
+            <div class="card-body">
+                <h4 class="text-primary editable" 
+                    contenteditable="true" 
+                    data-field="title"
+                    id="documentTitle">{{ result.mevzuat_basligi }}</h4>
+            </div>
+        </div>
+
+        <!-- Articles -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-list-ol me-2"></i>
+                    Maddeler
+                </h5>
+                <button id="addArticleBtn" class="btn btn-outline-success btn-sm">
+                    <i class="bi bi-plus-circle me-2"></i>
+                    Yeni Madde Ekle
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="articlesContainer">
+                    {% for madde in result.maddeler %}
+                        <div class="article-item" data-article-index="{{ loop.index0 }}">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-grip-vertical drag-handle me-2"></i>
+                                    <h6 class="mb-0 editable" 
+                                        contenteditable="true" 
+                                        data-field="article-title"
+                                        data-article-index="{{ loop.index0 }}">{{ madde.madde_numarasi }}</h6>
+                                </div>
+                                <div class="action-buttons">
+                                    <button class="btn btn-outline-primary btn-sm me-2 add-paragraph-btn" 
+                                            data-article-index="{{ loop.index0 }}">
+                                        <i class="bi bi-plus me-1"></i>
+                                        Fıkra Ekle
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm delete-article-btn" 
+                                            data-article-index="{{ loop.index0 }}">
+                                        <i class="bi bi-trash me-1"></i>
+                                        Sil
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="paragraphs-container" data-article-index="{{ loop.index0 }}">
+                                    {% for fikra in madde.fikralar %}
+                                        <div class="paragraph-item" data-paragraph-index="{{ loop.index0 }}">
+                                            <div class="d-flex justify-content-between align-items-start">
+                                                <div class="flex-grow-1">
+                                                    <i class="bi bi-grip-vertical drag-handle me-2"></i>
+                                                    <span class="badge bg-info me-2">{{ loop.index }}</span>
+                                                    <div class="editable d-inline-block" 
+                                                         contenteditable="true" 
+                                                         data-field="paragraph"
+                                                         data-article-index="{{ loop.index0 }}"
+                                                         data-paragraph-index="{{ loop.index0 }}"
+                                                         style="min-width: 200px;">{{ fikra }}</div>
+                                                </div>
+                                                <div class="action-buttons ms-2">
+                                                    <button class="btn btn-outline-danger btn-sm delete-paragraph-btn" 
+                                                            data-article-index="{{ loop.index0 }}"
+                                                            data-paragraph-index="{{ loop.index0 }}">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Silme Onayı</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="deleteMessage">Bu öğeyi silmek istediğinize emin misiniz?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Sil</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Document data
+        let documentData = {{ result | tojson_utf8 }};
+        const jsonFilename = "{{ json_filename }}";
+        
+        // Elements
+        const saveBtn = document.getElementById('saveBtn');
+        const saveIndicator = document.getElementById('saveIndicator');
+        const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+        
+        // Auto-save functionality
+        let saveTimeout;
+        let hasUnsavedChanges = false;
+        
+        function showSaveIndicator(message, type = 'success') {
+            saveIndicator.innerHTML = `
+                <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                    <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            
+            setTimeout(() => {
+                const alert = saveIndicator.querySelector('.alert');
+                if (alert) {
+                    alert.remove();
+                }
+            }, 3000);
+        }
+        
+        function markUnsaved() {
+            hasUnsavedChanges = true;
+            saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Kaydet *';
+            saveBtn.classList.remove('btn-success');
+            saveBtn.classList.add('btn-warning');
+            
+            // Auto-save after 2 seconds of inactivity
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(saveDocument, 2000);
+        }
+        
+        function markSaved() {
+            hasUnsavedChanges = false;
+            saveBtn.innerHTML = '<i class="bi bi-check me-2"></i>Kaydedildi';
+            saveBtn.classList.remove('btn-warning');
+            saveBtn.classList.add('btn-success');
+            
+            setTimeout(() => {
+                if (!hasUnsavedChanges) {
+                    saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Kaydet';
+                }
+            }, 2000);
+        }
+        
+        async function saveDocument() {
+            try {
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Kaydediliyor...';
+                
+                const response = await fetch(`/save/${jsonFilename}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(documentData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    markSaved();
+                    showSaveIndicator(result.message, 'success');
+                } else {
+                    showSaveIndicator(result.message, 'danger');
+                }
+            } catch (error) {
+                console.error('Save error:', error);
+                showSaveIndicator('Kaydetme sırasında hata oluştu', 'danger');
+            } finally {
+                saveBtn.disabled = false;
+            }
+        }
+        
+        // Event listeners for editing
+        document.addEventListener('input', function(e) {
+            if (e.target.classList.contains('editable')) {
+                const field = e.target.dataset.field;
+                const content = e.target.textContent || e.target.innerText;
+                
+                if (field === 'title') {
+                    documentData.mevzuat_basligi = content;
+                } else if (field === 'article-title') {
+                    const articleIndex = parseInt(e.target.dataset.articleIndex);
+                    documentData.maddeler[articleIndex].madde_numarasi = content;
+                } else if (field === 'paragraph') {
+                    const articleIndex = parseInt(e.target.dataset.articleIndex);
+                    const paragraphIndex = parseInt(e.target.dataset.paragraphIndex);
+                    documentData.maddeler[articleIndex].fikralar[paragraphIndex] = content;
+                }
+                
+                markUnsaved();
+            }
+        });
+        
+        // Manual save button
+        saveBtn.addEventListener('click', saveDocument);
+        
+        // Add new article
+        document.getElementById('addArticleBtn').addEventListener('click', function() {
+            const newArticle = {
+                madde_numarasi: `Madde ${documentData.maddeler.length + 1}`,
+                fikralar: ["Yeni fıkra metni..."]
+            };
+            
+            documentData.maddeler.push(newArticle);
+            renderArticles();
+            markUnsaved();
+        });
+        
+        // Add new paragraph
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('add-paragraph-btn') || e.target.closest('.add-paragraph-btn')) {
+                const btn = e.target.classList.contains('add-paragraph-btn') ? e.target : e.target.closest('.add-paragraph-btn');
+                const articleIndex = parseInt(btn.dataset.articleIndex);
+                
+                documentData.maddeler[articleIndex].fikralar.push("Yeni fıkra metni...");
+                renderArticles();
+                markUnsaved();
+            }
+        });
+        
+        // Delete confirmation
+        let deleteAction = null;
+        
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('delete-article-btn') || e.target.closest('.delete-article-btn')) {
+                const btn = e.target.classList.contains('delete-article-btn') ? e.target : e.target.closest('.delete-article-btn');
+                const articleIndex = parseInt(btn.dataset.articleIndex);
+                
+                document.getElementById('deleteMessage').textContent = 
+                    `"${documentData.maddeler[articleIndex].madde_numarasi}" maddesini silmek istediğinize emin misiniz?`;
+                
+                deleteAction = () => {
+                    documentData.maddeler.splice(articleIndex, 1);
+                    renderArticles();
+                    markUnsaved();
+                };
+                
+                deleteModal.show();
+            } else if (e.target.classList.contains('delete-paragraph-btn') || e.target.closest('.delete-paragraph-btn')) {
+                const btn = e.target.classList.contains('delete-paragraph-btn') ? e.target : e.target.closest('.delete-paragraph-btn');
+                const articleIndex = parseInt(btn.dataset.articleIndex);
+                const paragraphIndex = parseInt(btn.dataset.paragraphIndex);
+                
+                document.getElementById('deleteMessage').textContent = 
+                    'Bu fıkrayı silmek istediğinize emin misiniz?';
+                
+                deleteAction = () => {
+                    documentData.maddeler[articleIndex].fikralar.splice(paragraphIndex, 1);
+                    renderArticles();
+                    markUnsaved();
+                };
+                
+                deleteModal.show();
+            }
+        });
+        
+        document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+            if (deleteAction) {
+                deleteAction();
+                deleteAction = null;
+            }
+            deleteModal.hide();
+        });
+        
+        function renderArticles() {
+            const container = document.getElementById('articlesContainer');
+            container.innerHTML = '';
+            
+            documentData.maddeler.forEach((madde, articleIndex) => {
+                const articleHtml = `
+                    <div class="article-item" data-article-index="${articleIndex}">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-grip-vertical drag-handle me-2"></i>
+                                <h6 class="mb-0 editable" 
+                                    contenteditable="true" 
+                                    data-field="article-title"
+                                    data-article-index="${articleIndex}">${madde.madde_numarasi}</h6>
+                            </div>
+                            <div class="action-buttons">
+                                <button class="btn btn-outline-primary btn-sm me-2 add-paragraph-btn" 
+                                        data-article-index="${articleIndex}">
+                                    <i class="bi bi-plus me-1"></i>
+                                    Fıkra Ekle
+                                </button>
+                                <button class="btn btn-outline-danger btn-sm delete-article-btn" 
+                                        data-article-index="${articleIndex}">
+                                    <i class="bi bi-trash me-1"></i>
+                                    Sil
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="paragraphs-container" data-article-index="${articleIndex}">
+                                ${madde.fikralar.map((fikra, paragraphIndex) => `
+                                    <div class="paragraph-item" data-paragraph-index="${paragraphIndex}">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div class="flex-grow-1">
+                                                <i class="bi bi-grip-vertical drag-handle me-2"></i>
+                                                <span class="badge bg-info me-2">${paragraphIndex + 1}</span>
+                                                <div class="editable d-inline-block" 
+                                                     contenteditable="true" 
+                                                     data-field="paragraph"
+                                                     data-article-index="${articleIndex}"
+                                                     data-paragraph-index="${paragraphIndex}"
+                                                     style="min-width: 200px;">${fikra}</div>
+                                            </div>
+                                            <div class="action-buttons ms-2">
+                                                <button class="btn btn-outline-danger btn-sm delete-paragraph-btn" 
+                                                        data-article-index="${articleIndex}"
+                                                        data-paragraph-index="${paragraphIndex}">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', articleHtml);
+            });
+        }
+        
+        // Warn before leaving with unsaved changes
+        window.addEventListener('beforeunload', function(e) {
+            if (hasUnsavedChanges) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+        
+        // Initial focus on title for better UX
+        document.getElementById('documentTitle').focus();
+    </script>
+</body>
+</html>
