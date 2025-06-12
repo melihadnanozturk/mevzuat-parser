@@ -17,11 +17,17 @@ class DocumentParser:
             r'(?:^|\n)\s*(\d+)\s*\.\s*(?:MADDE|Madde)\s*[–\-:]?\s*'
         ]
         
-        # Pattern for numbered paragraph markers (main paragraphs)
-        self.main_paragraph_pattern = r'^\s*(\d+)\)\s*'
+        # Pattern for numbered paragraph markers (main paragraphs) - handles both (1) and 1) formats
+        self.main_paragraph_patterns = [
+            r'^\s*\((\d+)\)\s*',  # Format: (1), (2), (3)
+            r'^\s*(\d+)\)\s*'     # Format: 1), 2), 3)
+        ]
         
-        # Pattern for lettered sub-items
-        self.sub_item_pattern = r'^\s*([a-z])\)\s*'
+        # Pattern for lettered sub-items - handles both (a) and a) formats
+        self.sub_item_patterns = [
+            r'^\s*\(([a-z])\)\s*',  # Format: (a), (b), (c)
+            r'^\s*([a-z])\)\s*'     # Format: a), b), c)
+        ]
         
         # Patterns for subject headers that should be excluded from paragraphs
         self.subject_header_patterns = [
@@ -352,8 +358,12 @@ class DocumentParser:
                 self.logger.debug(f"Skipping subject header: {line}")
                 continue
             
-            # Check if line starts with numbered paragraph marker like "1)", "2)", etc.
-            main_paragraph_match = re.match(self.main_paragraph_pattern, line)
+            # Check if line starts with numbered paragraph marker like "(1)", "1)", etc.
+            main_paragraph_match = None
+            for pattern in self.main_paragraph_patterns:
+                main_paragraph_match = re.match(pattern, line)
+                if main_paragraph_match:
+                    break
             
             if main_paragraph_match:
                 # Save previous paragraph if exists
@@ -366,8 +376,12 @@ class DocumentParser:
                 current_paragraph = [line]
                 
             else:
-                # Check if line starts with lettered sub-item like "a)", "b)", etc.
-                sub_item_match = re.match(self.sub_item_pattern, line)
+                # Check if line starts with lettered sub-item like "(a)", "a)", etc.
+                sub_item_match = None
+                for pattern in self.sub_item_patterns:
+                    sub_item_match = re.match(pattern, line)
+                    if sub_item_match:
+                        break
                 
                 if sub_item_match:
                     # This is a sub-item, add it to current paragraph
