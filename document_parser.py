@@ -171,15 +171,21 @@ class DocumentParser:
         return text.strip()
     
     def _extract_title(self, text: str) -> str:
-        """Extract document title using heuristics."""
+        """Extract document title using improved heuristics."""
         lines = text.split('\n')
         
         # Look for title in first 10 lines
         candidates = []
+        title_lines = []
         
         for i, line in enumerate(lines[:10]):
             line = line.strip()
             if not line:
+                continue
+            
+            # Skip lines in parentheses (metadata like senate decisions)
+            if line.startswith('(') and line.endswith(')'):
+                self.logger.debug(f"Skipping parenthetical metadata: {line}")
                 continue
                 
             # Skip very short lines (less than 10 characters)
@@ -188,27 +194,87 @@ class DocumentParser:
                 
             # Skip lines that look like article headers
             if any(re.search(pattern, line, re.IGNORECASE) for pattern in self.article_patterns):
-                continue
+                break  # Stop searching when we hit article content
                 
-            # Prefer longer lines and lines appearing early
-            score = len(line) + (10 - i) * 5
+            # Skip common section headers that aren't main titles
+            section_headers = [
+                r'^\s*(?:amaç|kapsam|dayanak)\s*(?:,|\s|ve\s)*(?:amaç|kapsam|dayanak)*\s*$',
+                r'^\s*(?:genel|özel|son)\s+(?:hükümler|esaslar)\s*$',
+                r'^\s*(?:tanım|tanımlar)\s*$'
+            ]
             
-            # Bonus for all caps (common in titles)
-            if line.isupper():
+            if any(re.match(pattern, line, re.IGNORECASE) for pattern in section_headers):
+                break  # Stop searching when we hit section headers
+            
+            # Check if this line looks like a title
+            is_title_candidate = False
+            score = 0
+            
+            # High score for lines with significant uppercase content
+            uppercase_ratio = sum(1 for c in line if c.isupper()) / len(line)
+            if uppercase_ratio > 0.7:  # At least 70% uppercase
+                score += 30
+                is_title_candidate = True
+            elif uppercase_ratio > 0.5:  # At least 50% uppercase
+                score += 15
+                is_title_candidate = True
+            
+            # Bonus for containing institution names
+            institution_keywords = [
+                'üniversite', 'university', 'fakülte', 'enstitü', 'yönetim', 'senato',
+                'program', 'esaslar', 'yönetmelik', 'tüzük', 'yönerge'
+            ]
+            
+            if any(keyword in line.lower() for keyword in institution_keywords):
                 score += 20
-                
-            # Bonus for centered-looking text (has spaces at start/end)
-            if line.startswith(' ') or line.endswith(' '):
+                is_title_candidate = True
+            
+            # Prefer longer meaningful lines
+            if len(line) > 20:
                 score += 10
-                
-            candidates.append((score, line))
+                is_title_candidate = True
+            
+            # Early lines get bonus (but less than before)
+            score += (10 - i) * 2
+            
+            # Penalty for lines with dates or numbers that look like metadata
+            if re.search(r'\d{1,2}[./]\d{1,2}[./]\d{4}', line):  # Date patterns
+                score -= 15
+            
+            if re.search(r'sayılı.*?karar', line, re.IGNORECASE):  # Decision references
+                score -= 20
+            
+            if is_title_candidate:
+                candidates.append((score, i, line))
         
-        if candidates:
-            # Return the highest scoring candidate
-            candidates.sort(key=lambda x: x[0], reverse=True)
-            return candidates[0][1].strip()
+        if not candidates:
+            return "Mevzuat Başlığı Tespit Edilemedi"
         
-        return "Mevzuat Başlığı Tespit Edilemedi"
+        # Sort by score
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        
+        # Try to combine consecutive high-scoring lines into a multi-line title
+        best_candidate = candidates[0]
+        best_score, best_index, best_line = best_candidate
+        
+        # Look for consecutive title lines
+        title_parts = [best_line]
+        
+        # Check lines immediately before and after the best candidate
+        for score, index, line in candidates[1:]:
+            if abs(index - best_index) <= 1 and score > best_score * 0.6:  # Adjacent and reasonably scored
+                if index < best_index:
+                    title_parts.insert(0, line)
+                else:
+                    title_parts.append(line)
+        
+        # Combine title parts
+        combined_title = ' '.join(title_parts).strip()
+        
+        # Clean up the title
+        combined_title = ' '.join(combined_title.split())  # Normalize whitespace
+        
+        return combined_title if combined_title else "Mevzuat Başlığı Tespit Edilemedi"
     
     def _extract_articles(self, text: str) -> List[Dict]:
         """Extract articles and their paragraphs."""

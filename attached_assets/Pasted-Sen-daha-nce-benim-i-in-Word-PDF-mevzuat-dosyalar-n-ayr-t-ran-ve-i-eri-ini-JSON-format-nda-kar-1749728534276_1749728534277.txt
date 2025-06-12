@@ -1,0 +1,33 @@
+Sen, daha önce benim için Word/PDF mevzuat dosyalarını ayrıştıran ve içeriğini JSON formatında çıkaran bir Python web uygulaması (Flask/FastAPI tabanlı) geliştirdin. Sistem, madde ve fıkra ayrıştırmada genel olarak iyi çalışıyor. Ancak, şimdi **mevzuat başlığının tespiti** konusunda bir iyileştirme yapılması gerekiyor.
+
+MEVCUT SORUN:
+Sistem, bazen mevzuatın gerçek ana başlığını almak yerine, ana başlığın hemen altında yer alan ve genellikle parantez içinde bulunan senato kararı, onay tarihi gibi meta bilgileri `mevzuat_basligi` olarak hatalı bir şekilde atıyor.
+
+Örneğin, aşağıdaki gibi bir metin başlangıcında: SAKARYA ÜNİVERSİTESİ
+BÜTÜNLEŞİK YÜKSEK LİSANS PROGRAMI SENATO ESASLARI
+(Senatonun 24/08/2023 tarihli 652 sayılı ve “20” no’lu kararı ile kabul edilmiştir.)
+Amaç, Kapsam ve Dayanak
+Madde 1: Bütünleşik yüksek lisans programı kapsamında...
+
+
+Mevcut sistem, `mevzuat_basligi` olarak "(Senatonun 24/08/2023 tarihli 652 sayılı ve “20” no’lu kararı ile kabul edilmiştir.)" metnini alabiliyor.
+
+İSTENEN DAVRANIŞ:
+Yukarıdaki örnek için `mevzuat_basligi` olarak "SAKARYA ÜNİVERSİTESİ BÜTÜNLEŞİK YÜKSEK LİSANS PROGRAMI SENATO ESASLARI" metninin (iki satır birleştirilmiş olarak veya en anlamlı ilk satırlar) alınması gerekmektedir.
+
+İSTENEN İYİLEŞTİRME:
+Python'daki `mevzuat_basligi` tespit etme mantığını aşağıdaki şekilde güncellemeni istiyorum:
+
+1.  **Başlık Arama Alanı:** Başlık genellikle dokümanın ilk birkaç satırında (örneğin ilk 5-10 satır) yer alır. Arama bu alanla sınırlandırılmalıdır.
+2.  **Pozitif Başlık Kriterleri:**
+    *   Genellikle TAMAMI BÜYÜK HARFLERDEN oluşan veya önemli ölçüde büyük harf içeren satırlar başlık olma potansiyeline sahiptir.
+    *   Başlık birden fazla satıra yayılabilir. Bu durumda, anlamlı ve birbirini takip eden bu tür satırlar birleştirilerek tek bir başlık metni oluşturulmalıdır.
+3.  **Negatif Başlık Kriterleri (Hariç Tutulacaklar):**
+    *   **Parantez İçindeki Meta Bilgiler:** Özellikle `(Senatonun ... kararı ile kabul edilmiştir.)`, `(Yönetim Kurulunun ... tarihli ... sayılı kararı)` gibi kalıplarla başlayan ve tamamen parantez içinde yer alan satırlar KESİNLİKLE başlık olarak alınmamalıdır. Bu tür satırlar, potansiyel başlık adayları arasından elenmelidir.
+    *   **Kısa ve Anlamsız Satırlar:** Çok kısa (örneğin, 3-4 kelimeden az) ve genel bir başlık ifade etmeyen satırlar (eğer tek başına ise) dikkate alınmamalıdır.
+    *   **Madde Başlangıçları:** "Madde 1:", "Amaç, Kapsam ve Dayanak" gibi açıkça madde veya bölüm başlığı olan satırlar ana mevzuat başlığı değildir ve bunlarla karşılaşıldığında başlık arama sonlandırılabilir.
+
+LÜTFEN İSTENENLER:
+*   Mevcut Python kodundaki `mevzuat_basligi` tespit etme fonksiyonunu/mantığını bu yeni kriterlere göre güncelle.
+
+Özetle, hedefimiz, dokümanın başındaki gerçek, çok satırlı olabilen ana başlığı doğru bir şekilde yakalamak ve parantez içindeki onay/karar metinlerini başlık olarak almaktan kaçınmaktır.
