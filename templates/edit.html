@@ -154,7 +154,7 @@
                         <h6 class="mb-0">
                             <i class="bi bi-file-pdf me-2"></i>
                             <span id="pdfFileName">
-                                {% if result._metadata and result._metadata.file_type == 'pdf' %}
+                                {% if result.get('_metadata') and result._metadata.get('file_type') == 'pdf' %}
                                     {{ result._metadata.original_filename }}
                                 {% else %}
                                     Orijinal Dosya
@@ -162,7 +162,7 @@
                             </span>
                         </h6>
                     </div>
-                    {% if result._metadata and result._metadata.file_type == 'pdf' %}
+                    {% if result.get('_metadata') and result._metadata.get('file_type') == 'pdf' %}
                         <iframe id="pdfViewer" 
                                 class="pdf-iframe"
                                 src="/view-pdf/{{ json_filename }}">
@@ -172,7 +172,7 @@
                             <i class="bi bi-file-earmark-text display-4 mb-3"></i>
                             <h5>PDF Mevcut Değil</h5>
                             <p>Bu dosya PDF formatında değil veya görüntülenemiyor.</p>
-                            <small class="text-muted">Dosya Türü: {{ result._metadata.file_type if result._metadata else 'Bilinmiyor' }}</small>
+                            <small class="text-muted">Dosya Türü: {{ result.get('_metadata', {}).get('file_type', 'Bilinmiyor') }}</small>
                         </div>
                     {% endif %}
                 </div>
@@ -444,6 +444,13 @@
         });
         
         // PDF is now displayed inline, no modal needed
+        // Debug metadata
+        console.log('Document data:', documentData);
+        console.log('Metadata:', documentData._metadata);
+        if (documentData._metadata) {
+            console.log('File type:', documentData._metadata.file_type);
+            console.log('Original filename:', documentData._metadata.original_filename);
+        }
         
         // Add new article
         document.getElementById('addArticleBtn').addEventListener('click', function() {
