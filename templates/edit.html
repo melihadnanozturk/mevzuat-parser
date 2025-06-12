@@ -570,15 +570,16 @@
                 pageCount = pdf.numPages;
                 pdfLoaded = true;
                 
-                // Hide loading indicator
+                // Clear loading indicator and add canvas
                 if (loadingIndicator) {
-                    loadingIndicator.style.display = 'none';
+                    pdfCanvas.removeChild(loadingIndicator);
                 }
                 
                 // Add canvas to container
                 canvas.style.display = 'block';
                 canvas.style.margin = '0 auto';
                 canvas.style.border = '1px solid #dee2e6';
+                canvas.style.backgroundColor = 'white';
                 pdfCanvas.appendChild(canvas);
                 
                 // Render first page
