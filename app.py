@@ -69,6 +69,9 @@ def upload_file():
             file.save(filepath)
             
             try:
+                # Get file extension
+                file_extension = filepath.lower().split('.')[-1]
+                
                 # Parse the document
                 parser = DocumentParser()
                 result = parser.parse_document(filepath)
@@ -81,12 +84,17 @@ def upload_file():
                 json_filename = f"mevzuat_{uuid.uuid4().hex}.json"
                 json_filepath = os.path.join(app.config['UPLOAD_FOLDER'], json_filename)
                 
+                # Store original file info with result
+                result['_metadata'] = {
+                    'original_filename': filename,
+                    'original_file_path': unique_filename,
+                    'file_type': file_extension
+                }
+                
                 with open(json_filepath, 'w', encoding='utf-8') as json_file:
                     json.dump(result, json_file, ensure_ascii=False, indent=2)
                 
-                # Clean up the original uploaded file
-                if os.path.exists(filepath):
-                    os.remove(filepath)
+                # Keep the original file for PDF viewing (don't delete it)
                 
                 return render_template('result.html', 
                                      result=result, 
@@ -145,6 +153,25 @@ def save_document(json_filename):
     except Exception as e:
         app.logger.error(f"Save error: {str(e)}")
         return jsonify({'success': False, 'message': 'Kaydetme hatası oluştu'})
+
+@app.route('/view-pdf/<json_filename>')
+def view_pdf(json_filename):
+    """Serve the original PDF file for viewing."""
+    try:
+        json_filepath = os.path.join(app.config['UPLOAD_FOLDER'], json_filename)
+        if os.path.exists(json_filepath):
+            with open(json_filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            if '_metadata' in data and data['_metadata']['file_type'] == 'pdf':
+                pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], data['_metadata']['original_file_path'])
+                if os.path.exists(pdf_path):
+                    return send_file(pdf_path, mimetype='application/pdf')
+        
+        return "PDF dosyası bulunamadı", 404
+    except Exception as e:
+        app.logger.error(f"PDF view error: {str(e)}")
+        return "PDF görüntüleme hatası", 500
 
 @app.route('/download/<filename>')
 def download_file(filename):
