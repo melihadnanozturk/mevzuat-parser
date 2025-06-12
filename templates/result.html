@@ -59,6 +59,23 @@
             flex-direction: column;
             color: var(--bs-text-muted);
         }
+        .textLayer {
+            position: absolute;
+            left: 0;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+            opacity: 0.2;
+            line-height: 1.0;
+        }
+        .textLayer > span {
+            color: transparent;
+            position: absolute;
+            white-space: pre;
+            cursor: text;
+            transform-origin: 0% 0%;
+        }
     </style>
 </head>
 <body>
@@ -145,7 +162,7 @@
                                             </button>
                                         </div>
                                     </div>
-                                    <div id="pdfCanvas" class="overflow-auto" style="height: calc(100% - 60px);">
+                                    <div id="pdfCanvas" class="overflow-auto" style="height: calc(100% - 60px); position: relative;">
                                         <div class="d-flex justify-content-center align-items-center h-100" id="pdfLoadingIndicator">
                                             <div class="text-center">
                                                 <div class="spinner-border text-primary" role="status">
@@ -386,17 +403,37 @@
                 pageCount = pdf.numPages;
                 pdfLoaded = true;
                 
-                // Clear loading indicator and add canvas
+                // Clear loading indicator and add canvas container
                 if (loadingIndicator) {
                     pdfCanvas.removeChild(loadingIndicator);
                 }
                 
+                // Create container for canvas and text layer
+                const pageContainer = document.createElement('div');
+                pageContainer.style.position = 'relative';
+                pageContainer.style.margin = '0 auto';
+                pageContainer.style.border = '1px solid #dee2e6';
+                pageContainer.style.backgroundColor = 'white';
+                
                 // Add canvas to container
                 canvas.style.display = 'block';
-                canvas.style.margin = '0 auto';
-                canvas.style.border = '1px solid #dee2e6';
-                canvas.style.backgroundColor = 'white';
-                pdfCanvas.appendChild(canvas);
+                canvas.style.position = 'relative';
+                pageContainer.appendChild(canvas);
+                
+                // Create text layer div
+                const textLayerDiv = document.createElement('div');
+                textLayerDiv.className = 'textLayer';
+                textLayerDiv.style.position = 'absolute';
+                textLayerDiv.style.left = '0';
+                textLayerDiv.style.top = '0';
+                textLayerDiv.style.right = '0';
+                textLayerDiv.style.bottom = '0';
+                textLayerDiv.style.overflow = 'hidden';
+                textLayerDiv.style.opacity = '0.2';
+                textLayerDiv.style.lineHeight = '1.0';
+                pageContainer.appendChild(textLayerDiv);
+                
+                pdfCanvas.appendChild(pageContainer);
                 
                 // Render first page
                 renderPage(pageNum);
@@ -431,13 +468,40 @@
                     canvas.height = viewport.height;
                     canvas.width = viewport.width;
                     
+                    // Update container size
+                    const pageContainer = canvas.parentElement;
+                    pageContainer.style.width = viewport.width + 'px';
+                    pageContainer.style.height = viewport.height + 'px';
+                    
                     const renderContext = {
                         canvasContext: ctx,
                         viewport: viewport
                     };
                     
+                    // Render the PDF page
                     page.render(renderContext).promise.then(function() {
                         console.log('Page rendered successfully');
+                        
+                        // Render text layer for text selection
+                        return page.getTextContent();
+                    }).then(function(textContent) {
+                        // Clear previous text layer
+                        const textLayerDiv = pageContainer.querySelector('.textLayer');
+                        textLayerDiv.innerHTML = '';
+                        textLayerDiv.style.width = viewport.width + 'px';
+                        textLayerDiv.style.height = viewport.height + 'px';
+                        
+                        // Render text layer
+                        pdfjsLib.renderTextLayer({
+                            textContent: textContent,
+                            container: textLayerDiv,
+                            viewport: viewport,
+                            textDivs: []
+                        });
+                        
+                        console.log('Text layer rendered for selection');
+                    }).catch(function(error) {
+                        console.warn('Text layer rendering failed:', error);
                     });
                 });
             }
