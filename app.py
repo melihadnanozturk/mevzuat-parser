@@ -27,6 +27,12 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 # Ensure upload directory exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# Custom filter for UTF-8 JSON display
+@app.template_filter('tojson_utf8')
+def tojson_utf8(obj, indent=None):
+    """Convert object to JSON with proper UTF-8 encoding for display."""
+    return json.dumps(obj, ensure_ascii=False, indent=indent, separators=(',', ': '))
+
 def allowed_file(filename):
     """Check if the uploaded file has an allowed extension."""
     return '.' in filename and \
@@ -53,9 +59,9 @@ def upload_file():
             flash('Dosya seçilmedi', 'error')
             return redirect(request.url)
         
-        if file and allowed_file(file.filename):
+        if file and file.filename and allowed_file(file.filename):
             # Generate unique filename to avoid conflicts
-            filename = secure_filename(file.filename)
+            filename = secure_filename(file.filename or "unknown")
             unique_filename = f"{uuid.uuid4().hex}_{filename}"
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
             
