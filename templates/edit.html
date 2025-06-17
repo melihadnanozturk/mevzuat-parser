@@ -369,10 +369,10 @@
         backBtn.addEventListener('click', function() {
             if (hasUnsavedChanges) {
                 if (confirm('Kaydedilmemiş değişiklikler var. Çıkmak istediğinize emin misiniz?')) {
-                    window.history.back();
+                    window.location.href = `/result/${jsonFilename}`;
                 }
             } else {
-                window.history.back();
+                window.location.href = `/result/${jsonFilename}`;
             }
         });
         

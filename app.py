@@ -154,6 +154,23 @@ def save_document(json_filename):
         app.logger.error(f"Save error: {str(e)}")
         return jsonify({'success': False, 'message': 'Kaydetme hatası oluştu'})
 
+@app.route('/result/<json_filename>')
+def view_result(json_filename):
+    """Display the current JSON data as a result page."""
+    try:
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], json_filename)
+        if os.path.exists(filepath):
+            with open(filepath, 'r', encoding='utf-8') as f:
+                result = json.load(f)
+            return render_template('result.html', result=result, json_filename=json_filename, tojson_utf8=tojson_utf8)
+        else:
+            flash('Dosya bulunamadı', 'error')
+            return redirect(url_for('index'))
+    except Exception as e:
+        app.logger.error(f"Result view error: {str(e)}")
+        flash('Dosya açılırken hata oluştu', 'error')
+        return redirect(url_for('index'))
+
 @app.route('/view-pdf/<json_filename>')
 def view_pdf(json_filename):
     """Serve the original PDF file for viewing."""
