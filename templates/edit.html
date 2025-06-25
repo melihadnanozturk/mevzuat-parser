@@ -307,22 +307,61 @@
             }, 2000);
         }
         
+        function collectCurrentData() {
+            // Güncel verileri sayfadan topla
+            const currentData = {
+                mevzuat_basligi: document.getElementById('documentTitle').textContent.trim(),
+                maddeler: [],
+                _metadata: documentData._metadata // Metadata'yı koru
+            };
+            
+            // Tüm maddeleri topla
+            const articleElements = document.querySelectorAll('.article-item');
+            articleElements.forEach((articleEl, index) => {
+                const articleTitleEl = articleEl.querySelector('.editable[data-field="article-title"]');
+                const paragraphElements = articleEl.querySelectorAll('.editable[data-field="paragraph"]');
+                
+                const article = {
+                    madde_numarasi: articleTitleEl ? articleTitleEl.textContent.trim() : `Madde ${index + 1}`,
+                    fikralar: []
+                };
+                
+                // Fıkraları topla
+                paragraphElements.forEach(paragraphEl => {
+                    const content = paragraphEl.textContent.trim();
+                    if (content) {
+                        article.fikralar.push(content);
+                    }
+                });
+                
+                currentData.maddeler.push(article);
+            });
+            
+            return currentData;
+        }
+
         async function saveDocument() {
             try {
                 saveBtn.disabled = true;
                 saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Kaydediliyor...';
+                
+                // Güncel verileri topla
+                const currentData = collectCurrentData();
+                console.log('Saving data:', currentData);
                 
                 const response = await fetch(`/save/${jsonFilename}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(documentData)
+                    body: JSON.stringify(currentData)
                 });
                 
                 const result = await response.json();
                 
                 if (result.success) {
+                    // documentData'yı güncelle
+                    documentData = currentData;
                     markSaved();
                     showSaveIndicator(result.message, 'success');
                 } else {
